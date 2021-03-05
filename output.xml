@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<PropertyList>
+  <generic>
+    <output>
+      <line_separator>newline</line_separator>
+      <var_separator>:</var_separator>
+      <chunk>
+       <name>speed</name>
+       <format>Speed=%05.1f</format>
+       <type>float</type>
+       <node>/velocities/airspeed-kt</node>
+      </chunk>
+      <chunk>
+       <name>heading</name>
+       <format>Heading=%05.1f</format>
+       <type>float</type>
+       <node>/orientation/heading-deg</node>
+      </chunk>
+      <chunk>
+       <name>altitude</name>
+       <format>Altitude=%05.1f</format>
+       <node>/position/altitude-ft</node>
+      </chunk>
+      <chunk>
+       <name>rate of climb</name>
+       <format>Climb=%05.1f</format>
+       <type>float</type>
+       <node>/velocities/vertical-speed-fps</node>
+      </chunk>
+      <chunk>
+       <name>pitch angle</name>
+       <format>Pitch=%05.1f</format>
+       <type>float</type>
+       <node>/orientation/pitch-deg</node>
+      </chunk>
+      <chunk>
+       <name>bank angle</name>
+       <format>Bank=%05.1f</format>
+       <type>float</type>
+       <node>/orientation/roll-deg</node>
+      </chunk>
+      <chunk>
+       <name>engine</name>
+       <format>RPM=%02d</format>
+       <node>/engines/engine[0]/rpm</node>
+      </chunk>
+      <!-- ##### GPS ##### -->
+      <chunk>
+	<name>latitude</name>
+	<type>double</type>
+       <format>Latitude=%05.1f</format>
+	<node>/position/latitude-deg</node>
+      </chunk>
+      <chunk>
+	<name>longitude</name>
+	<type>double</type>
+       <format>Longitude=%05.1f</format>
+	<node>/position/longitude-deg</node>
+      </chunk>
+      <!-- ground course = atan(ve/vn), speed = sqrt((ve*ve) + (vn*vn)) -->
+      <chunk>
+	<name>speed - north</name>
+	<type>double</type>
+       <format>NorthSpeed=%05.1f</format>
+	<node>/velocities/speed-north-fps</node>
+      </chunk>
+      <chunk>
+	<name>speed - east</name>
+	<type>double</type>
+       <format>EastSpeed=%05.1f</format>
+	<node>/velocities/speed-east-fps</node>
+      </chunk>
+    </output>
+  </generic>
+</PropertyList>
