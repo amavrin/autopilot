@@ -14,7 +14,7 @@ def init():
     PIDS['bank'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['speed'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['speed'].output_limits = (0.0, 1.0)
-    PIDS['altitude'] = PID(0.002, 0.0001, 0.04, setpoint=0)
+    PIDS['altitude'] = PID(0.001, 0.0, 0.01, setpoint=0)
     PIDS['altitude'].output_limits = (-0.05, 0.01)
 
 def process_heading(heading_dev):
