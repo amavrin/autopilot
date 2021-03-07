@@ -7,20 +7,16 @@ import modbus_tk.modbus_tcp as modbus_tcp
 
 CONTROLLER = "78.107.114.6"
 
-ModbusVars = {}
-ModbusVars['speed'] = 0
-ModbusVars['heading'] = 0
-ModbusVars['altitude'] = 0
+MODBUS = {}
 
 def init():
     """ Connect to MB slave """
-    master = modbus_tcp.TcpMaster(host=CONTROLLER)
-    master.set_timeout(1.0)
-    return master
+    MODBUS['master'] = modbus_tcp.TcpMaster(host=CONTROLLER)
+    MODBUS['master'].set_timeout(1.0)
 
-def wordswap(f):
+def wordswap(_f):
     """ Swap bytes in float so modbus with Segnetics would work """
-    _a1 = bytearray(struct.pack("f", f))
+    _a1 = bytearray(struct.pack("f", _f))
 
     _a2 = bytearray()
     _a2.append(_a1[1])
@@ -32,17 +28,41 @@ def wordswap(f):
     return _a3[0]
 
 
-def test_modbus(master):
+def process_data(inputs):
+    """ Write data to modbus """
+    mb_speed = wordswap(float(inputs['Speed']))
+    mb_heading = wordswap(float(inputs['Heading']))
+    mb_altitude = wordswap(float(inputs['Altitude']))
+    mb_bank = wordswap(float(inputs['Bank']))
+
+    MODBUS['master'].execute(1, cst.WRITE_MULTIPLE_REGISTERS,
+                   starting_address=0,
+                   output_value=[mb_speed, mb_heading, mb_altitude, mb_bank],
+                   data_format='>ffff')
+
+    _m = MODBUS['master'].execute(1, cst.READ_INPUT_REGISTERS,
+                 0, 8,
+                 data_format='>ffff')
+
+    ret = {}
+    ret['throttle'] = wordswap(_m[0])
+    ret['rudder'] = wordswap(_m[1])
+    ret['elevator'] = wordswap(_m[2])
+    ret['aileron'] = wordswap(_m[3])
+
+    return ret
+
+def test_modbus():
     """ test MB write """
 
     data = [10.0, 20.0, 30.0]
 
-    master.execute(1, cst.WRITE_MULTIPLE_REGISTERS,
+    MODBUS['master'].execute(1, cst.WRITE_MULTIPLE_REGISTERS,
                    starting_address=0,
                    output_value=[wordswap(f) for f in data],
                    data_format='>fff')
 
-    _r1 = master.execute(1, cst.READ_HOLDING_REGISTERS,
+    _r1 = MODBUS['master'].execute(1, cst.READ_HOLDING_REGISTERS,
                    0, 6,
                    data_format='>fff')
 
@@ -50,7 +70,7 @@ def test_modbus(master):
     print(wordswap(_r1[1]))
     print(wordswap(_r1[2]))
 
-    _r2 = master.execute(1, cst.READ_INPUT_REGISTERS,
+    _r2 = MODBUS['master'].execute(1, cst.READ_INPUT_REGISTERS,
                    0, 2,
                    data_format='>f')
 
@@ -58,8 +78,8 @@ def test_modbus(master):
 
 def main():
     """ test main function """
-    master = init()
-    test_modbus(master)
+    init()
+    test_modbus()
 
 if __name__ == "__main__":
     main()
