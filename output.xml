@@ -49,13 +49,13 @@
       <chunk>
 	<name>latitude</name>
 	<type>double</type>
-       <format>Latitude=%05.1f</format>
+       <format>Latitude=%015.11f</format>
 	<node>/position/latitude-deg</node>
       </chunk>
       <chunk>
 	<name>longitude</name>
 	<type>double</type>
-       <format>Longitude=%05.1f</format>
+       <format>Longitude=%015.11f</format>
 	<node>/position/longitude-deg</node>
       </chunk>
       <!-- ground course = atan(ve/vn), speed = sqrt((ve*ve) + (vn*vn)) -->
