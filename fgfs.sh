@@ -1,4 +1,5 @@
 /Applications/FlightGear.app/Contents/MacOS/fgfs \
+--timeofday=noon \
 --prop:/nasal/local_weather/enabled=false \
 --metar=XXXX 012345Z 15003KT 19SM FEW072 FEW350 25/07 Q1028 NOSIG \
 --prop:/environment/weather-scenario=Core high pressure region \
