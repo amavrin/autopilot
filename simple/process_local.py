@@ -17,20 +17,23 @@ def init():
     Data['targetalt'] = 300.0
     Data['targetspeed'] = 100.0
     Data['engine_on_rpm'] = 100
-    PIDS['rudder'] = PID(0.01, 0.005, 0.001, setpoint=0)
-    PIDS['aileron'] = PID(0.01, 0.003, 0.01, setpoint=0)
+    PIDS['rudder_runway'] = PID(0.01, 0.005, 0.001, setpoint=0)
+    PIDS['aileron_level'] = PID(0.01, 0.03, 0.01, setpoint=0)
+    PIDS['aileron_level'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
-    PIDS['throttle'].output_limits = (0.0, 1.0)
-    PIDS['elevator'] = PID(0.001, 0.0, 0.01, setpoint=0)
-    PIDS['elevator'].output_limits = (-0.05, 0.01)
+    PIDS['throttle'].output_limits = (0.3, 1.0)
+    PIDS['elevator_level'] = PID(0.001, 0.0, 0.01, setpoint=0)
+    PIDS['elevator_level'].output_limits = (-0.05, 0.01)
+    PIDS['elevator_turn'] = PID(0.001, 0.0, 0.01, setpoint=0)
+    PIDS['elevator_turn'].output_limits = (-0.2, 0.05)
     States['current'] = 0
     States['program'] = []
     States['program'].append('initial')
     States['program'].append('takeoff')
     States['program'].append('climbing')
-    States['program'].append('turn180')
+    States['program'].append('turn_right')
     States['program'].append('level')
-    States['program'].append('turn180')
+    States['program'].append('turn_forward')
     States['program'].append('descending')
     States['program'].append('landing')
     States['program'].append('stop')
@@ -51,17 +54,29 @@ def process_heading(heading_dev, _state):
     rudder = 0.0
     if _state == 'takeoff':
         # During takeoff, rule a rudder
-        rudder = PIDS['rudder'](heading_dev)
+        rudder = PIDS['rudder_runway'](heading_dev)
     return rudder
 
 def process_bank(bank_dev, _state):
     """ Sample bank processing """
-    aileron = PIDS['aileron'](bank_dev)
+    if get_cur_state() == 'turn_right':
+        if bank_dev >= 0:
+            aileron = 0.0
+        else:
+            aileron = 0.015
+    else:
+        aileron = PIDS['aileron_level'](bank_dev)
+    print("aileron: {}".format(aileron))
     return aileron
 
 def process_altitude(altitude_dev, _state):
     """ Sample altitude processing """
-    return PIDS['elevator'](altitude_dev)
+    elevator = 0.0
+    if get_cur_state() == 'turn_right':
+        elevator = PIDS['elevator_turn'](altitude_dev)
+    else:
+        elevator = PIDS['elevator_level'](altitude_dev)
+    return elevator
 
 def process_speed(speed_dev, _state):
     """ Sample speed processing """
@@ -155,6 +170,13 @@ def process_data(inputs):
 
     if get_cur_state() == 'climbing':
         if altitude > Data['targetalt']:
+            SetPoints['heading'] = (InitialData['heading'] + 180) % 360
+            next_state()
+
+    if get_cur_state() == 'turn_right':
+        SetPoints['bank'] = 15
+        if heading < SetPoints['heading'] + 5 and SetPoints['heading'] < heading + 5:
+            SetPoints['bank'] = 0
             next_state()
 
     heading_dev = heading - SetPoints['heading']
@@ -171,6 +193,6 @@ def process_data(inputs):
     out['throttle'] = process_speed(speed_dev, get_cur_state())
 
     print("Deviations: Heading {:+06.2f}, altitude {:+06.2f}, bank {:+06.2f}, speed {:+06.2f}"
-          .format(heading_dev, altitude_dev, bank, speed_dev))
+          .format(heading_dev, altitude_dev, bank_dev, speed_dev))
 
     return out
