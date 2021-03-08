@@ -7,8 +7,8 @@ Data = {}
 SetPoints = {}
 InitialData = {}
 PIDS = {}
-# initial, takeoff, climbing, turn1,
-# level, turn2, descending, landing, stop
+# initial, takeoff, climbing, turn180,
+# level, turn180, descending, landing, stop
 States = {}
 
 def init():
@@ -23,7 +23,28 @@ def init():
     PIDS['throttle'].output_limits = (0.0, 1.0)
     PIDS['elevator'] = PID(0.001, 0.0, 0.01, setpoint=0)
     PIDS['elevator'].output_limits = (-0.05, 0.01)
-    States['current'] = "initial"
+    States['current'] = 0
+    States['program'] = []
+    States['program'].append('initial')
+    States['program'].append('takeoff')
+    States['program'].append('climbing')
+    States['program'].append('turn180')
+    States['program'].append('level')
+    States['program'].append('turn180')
+    States['program'].append('descending')
+    States['program'].append('landing')
+    States['program'].append('stop')
+
+def get_cur_state():
+    """ Return current state """
+    return States['program'][States['current']]
+
+def next_state():
+    """ Move to the next state """
+    if get_cur_state() != 'stop':
+        States['current'] += 1
+    else:
+        print("On the stop state, not advancing")
 
 def process_heading(heading_dev, _state):
     """ Sample heading processing """
@@ -87,7 +108,7 @@ def get_runway_center_correction(speed, center_dist):
     speed_meter_ps = speed * 0.514444
     # get the angle to center on railway in 100 sec
     center_correction = math.degrees(math.atan(center_dist/(speed_meter_ps*100 + 1)))
-    print("center_correction: {}".format(center_correction))
+    #print("center_correction: {}".format(center_correction))
     return center_correction
 
 def process_data(inputs):
@@ -102,9 +123,9 @@ def process_data(inputs):
     latitude = float(inputs['Latitude'])
     longitude = float(inputs['Longitude'])
 
-    print("State: {}".format(States['current']))
+    print("State: {}".format(get_cur_state()))
 
-    if States['current'] == 'initial':
+    if get_cur_state()  == 'initial':
         InitialData['heading'] = heading
         InitialData['altitude'] = altitude
         # y, east
@@ -118,9 +139,9 @@ def process_data(inputs):
         SetPoints['heading'] = InitialData['heading']
 
         if rpm > Data['engine_on_rpm']:
-            States['current'] = 'takeoff'
+            next_state()
 
-    if States['current'] == 'takeoff':
+    if get_cur_state() == 'takeoff':
         SetPoints['speed'] = Data['targetspeed']
         center_dist = get_runway_center_dist(InitialData['latitude'],
                           InitialData['longitude'],
@@ -129,25 +150,25 @@ def process_data(inputs):
         SetPoints['heading'] = InitialData['heading'] + center_correction
 
         if speed > Data['takeoffspeed']:
-            States['current'] = 'climbing'
+            next_state()
             SetPoints['altitude'] = Data['targetalt']
 
-    if States['current'] == 'climbing':
+    if get_cur_state() == 'climbing':
         if altitude > Data['targetalt']:
-            States['current'] = 'level'
+            next_state()
 
     heading_dev = heading - SetPoints['heading']
-    out['rudder'] = process_heading(heading_dev, States['current'])
+    out['rudder'] = process_heading(heading_dev, get_cur_state())
 
     # Climb to preset altitude
     altitude_dev = SetPoints['altitude'] - altitude
-    out['elevator'] = process_altitude(altitude_dev, States['current'])
+    out['elevator'] = process_altitude(altitude_dev, get_cur_state())
 
     bank_dev = bank - SetPoints['bank']
-    out['aileron'] = process_bank(bank_dev, States['current'])
+    out['aileron'] = process_bank(bank_dev, get_cur_state())
 
     speed_dev = speed - SetPoints['speed']
-    out['throttle'] = process_speed(speed_dev, States['current'])
+    out['throttle'] = process_speed(speed_dev, get_cur_state())
 
     print("Deviations: Heading {:+06.2f}, altitude {:+06.2f}, bank {:+06.2f}, speed {:+06.2f}"
           .format(heading_dev, altitude_dev, bank, speed_dev))
