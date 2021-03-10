@@ -28,19 +28,19 @@ def init():
     PIDS['elevator_turn'].output_limits = (-0.2, 0.05)
     States['current'] = 0
     States['program'] = []
-    States['program'].append('initial')
-    States['program'].append('takeoff')
-    States['program'].append('climbing')
-    States['program'].append('turn_right')
-    States['program'].append('level')
-    States['program'].append('turn_forward')
-    States['program'].append('descending')
-    States['program'].append('landing')
-    States['program'].append('stop')
+    States['program'].append({ 'name': 'initial' })
+    States['program'].append({ 'name': 'takeoff' })
+    States['program'].append({ 'name': 'climbing' })
+    States['program'].append({ 'name': 'turn_right' })
+    States['program'].append({ 'name': 'level' })
+    States['program'].append({ 'name': 'turn_forward' })
+    States['program'].append({ 'name': 'descending' })
+    States['program'].append({ 'name': 'landing' })
+    States['program'].append({ 'name': 'stop' })
 
 def get_cur_state():
     """ Return current state """
-    return States['program'][States['current']]
+    return States['program'][States['current']]['name']
 
 def next_state():
     """ Move to the next state """
