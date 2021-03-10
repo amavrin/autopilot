@@ -1,5 +1,5 @@
 /Applications/FlightGear.app/Contents/MacOS/fgfs \
---altitude=300 --heading=270 --vc=100 \
+--altitude=300 --heading=270 --vc=75 \
 --timeofday=noon \
 --prop:/nasal/local_weather/enabled=false \
 --metar=XXXX 012345Z 15003KT 19SM FEW072 FEW350 25/07 Q1028 NOSIG \
