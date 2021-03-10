@@ -31,9 +31,9 @@ def init():
     States['program'].append({ 'name': 'initial' })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
-    States['program'].append({ 'name': 'turn_right' })
+    States['program'].append({ 'name': 'turn' })
     States['program'].append({ 'name': 'level' })
-    States['program'].append({ 'name': 'turn_forward' })
+    States['program'].append({ 'name': 'turn' })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
     States['program'].append({ 'name': 'stop' })
@@ -41,6 +41,10 @@ def init():
 def get_cur_state():
     """ Return current state """
     return States['program'][States['current']]['name']
+
+def get_cur_arg():
+    """ Return current state arg """
+    return States['program'][States['current']]['arg']
 
 def next_state():
     """ Move to the next state """
@@ -59,7 +63,7 @@ def process_heading(heading_dev, _state):
 
 def process_bank(bank_dev, _state):
     """ Sample bank processing """
-    if get_cur_state() == 'turn_right':
+    if get_cur_state() == 'turn':
         if bank_dev >= 0:
             aileron = 0.0
         else:
@@ -72,7 +76,7 @@ def process_bank(bank_dev, _state):
 def process_altitude(altitude_dev, _state):
     """ Sample altitude processing """
     elevator = 0.0
-    if get_cur_state() == 'turn_right':
+    if get_cur_state() == 'turn':
         elevator = PIDS['elevator_turn'](altitude_dev)
     else:
         elevator = PIDS['elevator_level'](altitude_dev)
@@ -169,11 +173,11 @@ def process_data(inputs):
             SetPoints['altitude'] = Data['targetalt']
 
     if get_cur_state() == 'climbing':
-        if altitude > Data['targetalt']:
+        if altitude > SetPoints['altitude']
             SetPoints['heading'] = (InitialData['heading'] + 180) % 360
             next_state()
 
-    if get_cur_state() == 'turn_right':
+    if get_cur_state() == 'turn':
         SetPoints['bank'] = 15
         if heading < SetPoints['heading'] + 5 and SetPoints['heading'] < heading + 5:
             SetPoints['bank'] = 0
