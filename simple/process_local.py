@@ -1,7 +1,6 @@
 """ Process data locally """
 
 import math
-import time
 from simple_pid import PID
 
 Data = {}
@@ -15,28 +14,28 @@ States = {}
 def init():
     """ Init data for local processing """
     Data['takeoffspeed'] = 50.0
-    Data['targetalt'] = 300.0
+    Data['targetalt'] = 500.0
     Data['targetspeed'] = 100.0
     Data['engine_on_rpm'] = 100
     Data['turnbank'] = 15
-    Data['turn_headingdelta'] = 2
-    PIDS['rudder_runway'] = PID(0.01, 0.005, 0.001, setpoint=0)
+    Data['turn_headingdelta'] = 3
+    PIDS['rudder'] = PID(0.01, 0.005, 0.001, setpoint=0)
     PIDS['aileron_level'] = PID(0.01, 0.03, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['throttle'].output_limits = (0.3, 1.0)
-    PIDS['elevator_level'] = PID(0.001, 0.0, 0.01, setpoint=0)
-    PIDS['elevator_level'].output_limits = (-0.05, 0.01)
-    PIDS['elevator_turn'] = PID(0.001, 0.0, 0.01, setpoint=0)
-    PIDS['elevator_turn'].output_limits = (-0.2, 0.05)
+    PIDS['elevator'] = PID(0.001, 0.01, 0.01, setpoint=0)
+    PIDS['elevator'].output_limits = (-0.1, 0.01)
+    #PIDS['elevator_turn'] = PID(0.001, 0.001, 0.02, setpoint=0)
+    #PIDS['elevator_turn'].output_limits = (-0.2, 0.05)
     States['current'] = 0
     States['program'] = []
     States['program'].append({ 'name': 'initial' })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
-    States['program'].append({ 'name': 'turn', 'arg': 180 })
+    States['program'].append({ 'name': 'turn', 'arg': -180 })
     States['program'].append({ 'name': 'level' })
-    States['program'].append({ 'name': 'turn', 'arg': 180 })
+    States['program'].append({ 'name': 'turn', 'arg': -180 })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
     States['program'].append({ 'name': 'stop' })
@@ -66,15 +65,16 @@ def next_state():
     else:
         print("On the stop state, not advancing")
 
-def process_heading(heading_dev, _state):
+def process_heading(heading_dev):
     """ Sample heading processing """
     rudder = 0.0
-    if _state == 'takeoff':
-        # During takeoff, rule a rudder
-        rudder = PIDS['rudder_runway'](heading_dev)
+    if get_cur_state() == 'takeoff' or \
+       get_cur_state() == 'level' or \
+       get_cur_state() == 'climbing':
+        rudder = PIDS['rudder'](heading_dev)
     return rudder
 
-def process_bank(bank_dev, _state):
+def process_bank(bank_dev):
     """ Sample bank processing """
     if get_cur_state() == 'turn':
         if bank_dev >= 0:
@@ -86,16 +86,14 @@ def process_bank(bank_dev, _state):
     print("aileron: {}".format(aileron))
     return aileron
 
-def process_altitude(altitude_dev, _state):
+def process_altitude(altitude_dev):
     """ Sample altitude processing """
     elevator = 0.0
-    if get_cur_state() == 'turn':
-        elevator = PIDS['elevator_turn'](altitude_dev)
-    else:
-        elevator = PIDS['elevator_level'](altitude_dev)
+    if get_cur_state() != 'takeoff':
+        elevator = PIDS['elevator'](altitude_dev)
     return elevator
 
-def process_speed(speed_dev, _state):
+def process_speed(speed_dev):
     """ Sample speed processing """
     return PIDS['throttle'](speed_dev)
 
@@ -192,7 +190,7 @@ def process_data(inputs):
     if get_cur_state() == 'turn':
         if not get_cur_flag():
             SetPoints['heading'] = (SetPoints['heading'] + get_cur_arg()) % 360
-            SetPoints['bank'] = math.copysign(Data['turnbank'], get_cur_arg())
+            SetPoints['bank'] = math.copysign(Data['turnbank'], - get_cur_arg())
             set_cur_flag(True)
         if heading < SetPoints['heading'] + Data['turn_headingdelta'] \
            and SetPoints['heading'] < heading + Data['turn_headingdelta']:
@@ -200,17 +198,17 @@ def process_data(inputs):
             next_state()
 
     heading_dev = heading - SetPoints['heading']
-    out['rudder'] = process_heading(heading_dev, get_cur_state())
+    out['rudder'] = process_heading(heading_dev)
 
     # Climb to preset altitude
     altitude_dev = SetPoints['altitude'] - altitude
-    out['elevator'] = process_altitude(altitude_dev, get_cur_state())
+    out['elevator'] = process_altitude(altitude_dev)
 
     bank_dev = bank - SetPoints['bank']
-    out['aileron'] = process_bank(bank_dev, get_cur_state())
+    out['aileron'] = process_bank(bank_dev)
 
     speed_dev = speed - SetPoints['speed']
-    out['throttle'] = process_speed(speed_dev, get_cur_state())
+    out['throttle'] = process_speed(speed_dev)
 
     print("Deviations: Heading {:+06.2f}, altitude {:+06.2f}, bank {:+06.2f}, speed {:+06.2f}"
           .format(heading_dev, altitude_dev, bank_dev, speed_dev))
