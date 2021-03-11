@@ -1,5 +1,6 @@
 """ Process data locally """
 
+import time
 import math
 from simple_pid import PID
 
@@ -14,11 +15,13 @@ States = {}
 def init():
     """ Init data for local processing """
     Data['takeoffspeed'] = 50.0
-    Data['targetalt'] = 500.0
+    Data['targetalt'] = 200.0
     Data['targetspeed'] = 100.0
     Data['engine_on_rpm'] = 100
     Data['turnbank'] = 15
     Data['turn_headingdelta'] = 3
+    Data['level_distancedelta'] = 30
+    Data['level_maxangle'] = 45
     PIDS['rudder'] = PID(0.01, 0.005, 0.001, setpoint=0)
     PIDS['aileron_level'] = PID(0.01, 0.03, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
@@ -33,8 +36,12 @@ def init():
     States['program'].append({ 'name': 'initial' })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
-    States['program'].append({ 'name': 'turn', 'arg': -180 })
-    States['program'].append({ 'name': 'level' })
+    States['program'].append({ 'name': 'level', 'arg': (0, 4000) })
+    #States['program'].append({ 'name': 'turn', 'arg': -180 })
+    # 1000m right to start
+    #States['program'].append({ 'name': 'level', 'arg': (1000, 0) })
+    # 1000m right and 3000m back to start
+    #States['program'].append({ 'name': 'level', 'arg': (1000, -3000) })
     States['program'].append({ 'name': 'turn', 'arg': -180 })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
@@ -105,6 +112,71 @@ def get_xy_from_lat_lon(_lat, _lon):
     _y = 6371000 * r_lat
     return (_x, _y)
 
+def get_lat_lon_from_xy(_x, _y):
+    """ Calculate lat and lon from X and Y """
+    r_lat = _y / 6371000
+    r_lon = _x / 6371000 / math.cos(r_lat)
+    lat = math.degrees(r_lat)
+    lon = math.degrees(r_lon)
+    return (lat, lon)
+
+def get_x_y_from_xa_ya(_xa, _ya):
+    """ get Earth X and Y from xa, ya measured from start point
+        in the runway coordiante system """
+    # angle to runway in Earth coordinate system in degrees
+    runway_angle = (360 + 90 - InitialData['heading']) % 360
+    # angle to runway in Earth coordinate system in radians
+    r_runway_angle = math.radians(runway_angle)
+    # X and Y of starting point
+    (_x0, _y0) = get_xy_from_lat_lon(InitialData['latitude'],
+                                     InitialData['longitude'])
+    # distance from starting point
+    dist_a = math.sqrt(_xa*_xa + _ya*_ya)
+
+    # angle to the point in runway coordinate system in radians
+    # FIXME
+    if _xa == 0 and _ya > 0:
+        r_angle_a = math.pi/2
+    if _xa == 0 and _ya < 0:
+        r_angle_a = - math.pi/2
+    if _xa > 0:
+        r_angle_a = math.atan(_ya/_xa)
+    if _xa < 0:
+        r_angle_a = math.atan(_ya/_xa) + math.pi
+
+    # angle to the point in Earth coordiante system
+    r_angle = r_runway_angle - math.pi/2 + r_angle_a
+
+    delta_x = dist_a * math.cos(r_angle)
+    delta_y = dist_a * math.sin(r_angle)
+    _x = _x0 + delta_x
+    _y = _y0 + delta_y
+    return(_x, _y)
+
+def get_distance(_x0, _y0, _x1, _y1):
+    """ Calculate distance between 2 points """
+    delta_x = _x1 - _x0
+    delta_y = _y1 - _y0
+    distance = math.sqrt(delta_x*delta_x + delta_y*delta_y)
+    return distance
+
+def get_heading(_x0, _y0, _x1, _y1):
+    """ Calculate azimuth from x0, y0 to x1, y1 """
+    delta_x = _x1 - _x0
+    delta_y = _y1 - _y0
+    # FIXME
+    if delta_x == 0:
+        r_angle = math.pi/2
+    elif delta_x > 0:
+        r_angle = math.atan(delta_y/delta_x)
+    else:
+        r_angle = math.atan(delta_y/delta_x) + math.pi
+
+    angle = math.degrees(r_angle)
+
+    heading = (90 - angle + 360) % 360
+    return heading
+
 def get_runway_center_dist(_lat0, _lon0, _lat, _lon, alpha):
     """ Calculate angle from runway canter to the plane
         at the start point """
@@ -142,6 +214,8 @@ def get_runway_center_correction(speed, center_dist):
     return center_correction
 
 def process_data(inputs):
+    # pylint: disable=too-many-statements
+    # pylint: disable=too-many-locals
     """ Main processing function """
     out = {}
 
@@ -196,6 +270,21 @@ def process_data(inputs):
            and SetPoints['heading'] < heading + Data['turn_headingdelta']:
             SetPoints['bank'] = 0
             next_state()
+
+    if get_cur_state() == 'level':
+        (_x0, _y0) = get_xy_from_lat_lon(latitude, longitude)
+        (_xa, _ya) = get_cur_arg()
+        (_x1, _y1) = get_x_y_from_xa_ya(_xa, _ya)
+        SetPoints['heading'] = get_heading(_x0, _y0, _x1, _y1)
+        distance = get_distance(_x0, _y0, _x1, _y1)
+        print("Distance: {}, angle: {}".format(distance, SetPoints['heading']))
+        if distance < Data['level_distancedelta']:
+            next_state()
+        # FIXME
+        if SetPoints['heading'] > (heading + Data['level_maxangle']) % 360 or \
+           (SetPoints['heading'] + Data['level_maxangle']) % 360 < heading:
+            print("ERROR: can't get to the point.")
+            time.sleep(100)
 
     heading_dev = heading - SetPoints['heading']
     out['rudder'] = process_heading(heading_dev)
