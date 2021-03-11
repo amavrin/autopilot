@@ -1,5 +1,5 @@
 /Applications/FlightGear.app/Contents/MacOS/fgfs \
---altitude=300 --heading=270 --vc=75 \
+--altitude=500 --heading=270 --vc=100 \
 --timeofday=noon \
 --prop:/nasal/local_weather/enabled=false \
 --metar=XXXX 012345Z 15003KT 19SM FEW072 FEW350 25/07 Q1028 NOSIG \
@@ -10,6 +10,6 @@
 --airport=PHNL \
 --httpd=8080 \
 --telnet=1024 \
---generic=socket,out,2,localhost,10000,udp,output \
---generic=socket,in,2,localhost,10001,udp,input
+--generic=socket,out,4,localhost,10000,udp,output \
+--generic=socket,in,4,localhost,10001,udp,input
 
