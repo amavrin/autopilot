@@ -1,6 +1,7 @@
 """ Process data locally """
 
 import math
+import time
 from simple_pid import PID
 
 Data = {}
@@ -17,6 +18,8 @@ def init():
     Data['targetalt'] = 300.0
     Data['targetspeed'] = 100.0
     Data['engine_on_rpm'] = 100
+    Data['turnbank'] = 15
+    Data['turn_headingdelta'] = 2
     PIDS['rudder_runway'] = PID(0.01, 0.005, 0.001, setpoint=0)
     PIDS['aileron_level'] = PID(0.01, 0.03, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
@@ -31,9 +34,9 @@ def init():
     States['program'].append({ 'name': 'initial' })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
-    States['program'].append({ 'name': 'turn' })
+    States['program'].append({ 'name': 'turn', 'arg': 180 })
     States['program'].append({ 'name': 'level' })
-    States['program'].append({ 'name': 'turn' })
+    States['program'].append({ 'name': 'turn', 'arg': 180 })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
     States['program'].append({ 'name': 'stop' })
@@ -45,6 +48,16 @@ def get_cur_state():
 def get_cur_arg():
     """ Return current state arg """
     return States['program'][States['current']]['arg']
+
+def get_cur_flag():
+    """ Return True if state flag is set """
+    if 'flag' not in States['program'][States['current']]:
+        return False
+    return States['program'][States['current']]['flag']
+
+def set_cur_flag(flag):
+    """ Set state flag """
+    States['program'][States['current']]['flag'] = flag
 
 def next_state():
     """ Move to the next state """
@@ -169,17 +182,20 @@ def process_data(inputs):
         SetPoints['heading'] = InitialData['heading'] + center_correction
 
         if speed > Data['takeoffspeed']:
-            next_state()
             SetPoints['altitude'] = Data['targetalt']
+            next_state()
 
     if get_cur_state() == 'climbing':
-        if altitude > SetPoints['altitude']
-            SetPoints['heading'] = (InitialData['heading'] + 180) % 360
+        if altitude > SetPoints['altitude']:
             next_state()
 
     if get_cur_state() == 'turn':
-        SetPoints['bank'] = 15
-        if heading < SetPoints['heading'] + 5 and SetPoints['heading'] < heading + 5:
+        if not get_cur_flag():
+            SetPoints['heading'] = (SetPoints['heading'] + get_cur_arg()) % 360
+            SetPoints['bank'] = math.copysign(Data['turnbank'], get_cur_arg())
+            set_cur_flag(True)
+        if heading < SetPoints['heading'] + Data['turn_headingdelta'] \
+           and SetPoints['heading'] < heading + Data['turn_headingdelta']:
             SetPoints['bank'] = 0
             next_state()
 
