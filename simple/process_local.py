@@ -181,30 +181,24 @@ def get_heading_diff(_h1, _h2):
         hdiff -= 360
     return hdiff
 
-def get_runway_center_dist(_lat0, _lon0, _lat, _lon, alpha):
-    """ Calculate angle from runway canter to the plane
-        at the start point """
+def get_runway_center_dist(_lat0, _lon0, _lat, _lon, _a0):
+    """ Calculate distance from runway center to the plane """
+    # Starting point
     (_x0, _y0) = get_xy_from_lat_lon(_lat0, _lon0)
+    # Current plane point
     (_x, _y) = get_xy_from_lat_lon(_lat, _lon)
 
     delta_x = _x - _x0
     delta_y = _y - _y0
 
-    if delta_x == 0:
-        betta = 0
-        gamma = 0
-    else:
-        angle_to_plane = math.degrees(math.atan(delta_y/delta_x))
-        if delta_x < 0:
-            # going to west
-            angle_to_plane += 180
-        # convert to azimuth
-        gamma = (90 - angle_to_plane + 360) % 360
-        # angle from runway center to direction to plane
-        betta = alpha - gamma
+    r_angle_to_plane = math.atan2(delta_y, delta_x)
+    angle_to_plane = math.degrees(r_angle_to_plane)
+    _a1 = angle_to_heading(angle_to_plane)
+    # angle from runway center to direction to plane
+    _a_delta = get_heading_diff(_a1, _a0)
 
-    distance_from_start = math.sqrt(delta_x*delta_x + delta_y*delta_y)
-    center_dev = distance_from_start * math.tan(math.radians(betta))
+    distance_from_start = get_distance(_x0, _y0, _x, _y)
+    center_dev = distance_from_start * math.tan(math.radians(_a_delta))
     return center_dev
 
 def get_runway_center_correction(speed, center_dist):
