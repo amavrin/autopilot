@@ -1,5 +1,6 @@
 """ Process data locally """
 
+import time
 import math
 from simple_pid import PID
 
@@ -11,34 +12,45 @@ PIDS = {}
 # level, descending, landing, stop
 States = {}
 
+def error_pause(_s,_t):
+    """ Print message and sleep """
+    print("ERROR: {}".format(_s))
+    time.sleep(_t)
+
 def init():
     """ Init data for local processing """
     Data['takeoffspeed'] = 50.0
-    Data['targetalt'] = 700.0
-    Data['targetspeed'] = 100.0
+    Data['targetalt'] = 800.0
+    Data['targetspeed'] = 150.0
     Data['engine_on_rpm'] = 100
-    Data['turnbank'] = 15
-    Data['turn_headingdelta'] = 3
-    Data['level_distancedelta'] = 30
+    Data['turnbank'] = 40
+    Data['turn_headingdelta'] = 0.5
+    Data['level_distancedelta'] = 40
     Data['level_maxangle'] = 45
-    PIDS['rudder'] = PID(0.01, 0.005, 0.001, setpoint=0)
-    PIDS['rudder'].output_limits = (-1.0, 1.0)
-    PIDS['aileron_level'] = PID(0.01, 0.03, 0.01, setpoint=0)
+    PIDS['rudder_runway'] = PID(0.01, 0.005, 0.001, setpoint=0)
+    PIDS['rudder_runway'].output_limits = (-1.0, 1.0)
+    PIDS['rudder_flight'] = PID(0.01, 0.002, 0.001, setpoint=0)
+    PIDS['rudder_flight'].output_limits = (-0.5, 0.5)
+    PIDS['aileron_level'] = PID(0.02, 0.01, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
     PIDS['aileron_turn'] = PID(0.01, 0.0, 0.0, setpoint=0)
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['throttle'].output_limits = (0.3, 1.0)
-    PIDS['elevator'] = PID(0.001, 0.01, 0.01, setpoint=0)
+    PIDS['elevator'] = PID(0.002, 0.01, 0.01, setpoint=0)
     PIDS['elevator'].output_limits = (-0.1, 0.01)
     States['current'] = 0
     States['program'] = []
     States['program'].append({ 'name': 'initial' })
+    States['program'].append({ 'name': 'climbing' })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
+    States['program'].append({ 'name': 'level', 'arg': (0, 5000) })
     States['program'].append({ 'name': 'turn', 'arg': -90 })
     # 2000m right and 4000m back to start
-    States['program'].append({ 'name': 'level', 'arg': (-2000, -3000) })
+    States['program'].append({ 'name': 'level', 'arg': (-700, -3000) })
+    States['program'].append({ 'name': 'turn', 'arg': 90 })
+    States['program'].append({ 'name': 'level', 'arg': (-700, -5000) })
     States['program'].append({ 'name': 'turn', 'arg': -270 })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
@@ -72,18 +84,29 @@ def next_state():
 def process_heading(heading_dev):
     """ Sample heading processing """
     rudder = 0.0
-    if get_cur_state() in ('takeoff', 'level', 'climbing'):
-        rudder = PIDS['rudder'](heading_dev)
-    if get_cur_state() in ('turn', 'level'):
+    _k = 0.0
+    if get_cur_state() == 'takeoff':
+        # Only ise rudder on the runway
+        rudder = PIDS['rudder_runway'](heading_dev)
+
+    if get_cur_state() in ('level', 'climbing', 'turn'):
         if abs(heading_dev) < 90:
-            # Gradually decrease bank as heading_diff goes to 0
-            print("Gradually decrease bank")
-            _k = math.atan(math.radians(- heading_dev))
-            SetPoints['bank'] = _k*Data['turnbank']
-            print("SetPoints['bank']: {}".format(SetPoints['bank']))
+            rudder = PIDS['rudder_flight'](heading_dev)
+            if abs(heading_dev) > Data['turn_headingdelta']:
+                # Heading error is average, gradually set bank
+                #PIDS['rudder_flight'].auto_mode = False
+                _k = math.atan(math.radians(- heading_dev))
+            print("Gradually set _k for heading_dev {}: {}".format(heading_dev, _k))
+        elif get_cur_state() == 'turn':
+            # Set bank to turnbank with the respect to required direction
+            _k = math.copysign(1, get_cur_arg())
+            print("Gradually set _k for heading_dev {}: {}".format(heading_dev, _k))
         else:
-            print("Set bank")
-            SetPoints['bank'] = math.copysign(Data['turnbank'], get_cur_arg())
+            error_pause("Heading error is too large: {} and not turning"
+                        .format(heading_dev), 100)
+
+    SetPoints['bank'] = _k*Data['turnbank']
+    print("SetPoints['bank']: {}".format(SetPoints['bank']))
     return rudder
 
 def process_bank(bank_dev):
@@ -100,7 +123,7 @@ def process_altitude(altitude_dev):
     """ Sample altitude processing """
     elevator = 0.0
     if get_cur_state() != 'takeoff':
-        elevator = PIDS['elevator'](altitude_dev)
+        elevator = PIDS['elevator'](- altitude_dev)
     return elevator
 
 def process_speed(speed_dev):
@@ -279,13 +302,13 @@ def process_data(inputs):
         if distance < Data['level_distancedelta']:
             next_state()
         if abs(heading_error) > Data['level_maxangle']:
-            print("ERROR: can't get to the point.")
+            error_pause("can't get to the point", 100)
 
     heading_dev = get_heading_diff(SetPoints['heading'], heading)
     out['rudder'] = process_heading(heading_dev)
 
     # Climb to preset altitude
-    altitude_dev = SetPoints['altitude'] - altitude
+    altitude_dev = altitude - SetPoints['altitude']
     out['elevator'] = process_altitude(altitude_dev)
 
     bank_dev = bank - SetPoints['bank']
@@ -300,19 +323,5 @@ def process_data(inputs):
     return out
 
 if __name__ == "__main__":
-    InitialData['heading'] = 270
-    InitialData['altitude'] = 0.0
-    # Palaca sqare 59.939018, 30.316177
-    InitialData['latitude'] = 59.939018
-    InitialData['longitude'] = 30.316177
-    # Admitalty 59.939055, 30.306933
-    ADM_LAT = 59.939055
-    ADM_LON = 30.306933
-    (_x0, _y0) = get_xy_from_lat_lon(InitialData['latitude'],
-                                     InitialData['longitude'])
-    (_x, _y) = get_xy_from_xa_ya(-1000, 0)
-    _h = get_heading(_x0, _y0, _x, _y)
-    print(_h)
-    (_x1, _y1) = get_xy_from_lat_lon(ADM_LAT, ADM_LON)
-    _h = get_heading(_x1, _y1, _x, _y)
+    _h = get_heading_diff(40,30)
     print(_h)
