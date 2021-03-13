@@ -14,7 +14,7 @@ States = {}
 def init():
     """ Init data for local processing """
     Data['takeoffspeed'] = 50.0
-    Data['targetalt'] = 600.0
+    Data['targetalt'] = 700.0
     Data['targetspeed'] = 100.0
     Data['engine_on_rpm'] = 100
     Data['turnbank'] = 15
@@ -34,12 +34,12 @@ def init():
     States['program'].append({ 'name': 'initial' })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
-    States['program'].append({ 'name': 'turn', 'arg': -180 })
+    States['program'].append({ 'name': 'turn', 'arg': -90 })
     # 2000m right to start
-    States['program'].append({ 'name': 'level', 'arg': (2000, 0) })
+    States['program'].append({ 'name': 'level', 'arg': (-2000, 0) })
     # 2000m right and 4000m back to start
-    States['program'].append({ 'name': 'level', 'arg': (2000, -4000) })
-    States['program'].append({ 'name': 'turn', 'arg': -180 })
+    States['program'].append({ 'name': 'level', 'arg': (-2000, -3000) })
+    States['program'].append({ 'name': 'turn', 'arg': -270 })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
     States['program'].append({ 'name': 'stop' })
@@ -133,25 +133,17 @@ def get_xy_from_xa_ya(_xa, _ya):
     runway_angle = heading_to_angle(InitialData['heading'])
     # angle to runway in Earth coordinate system in radians
     r_runway_angle = math.radians(runway_angle)
-    # X and Y of starting point
-    (_x0, _y0) = get_xy_from_lat_lon(InitialData['latitude'],
-                                     InitialData['longitude'])
     # distance from starting point
     dist_a = get_distance(0, 0, _xa, _ya)
-
     # angle to the point in runway coordinate system in radians
     r_angle_a = math.atan2(_ya, _xa)
-
     # angle between runway and the point
     r_runway_angle_a = r_angle_a - math.pi/2
-
     # angle to the point in Earth coordiante system
     r_angle = r_runway_angle + r_runway_angle_a
 
-    delta_x = dist_a * math.cos(r_angle)
-    delta_y = dist_a * math.sin(r_angle)
-    _x = _x0 + delta_x
-    _y = _y0 + delta_y
+    _x = dist_a * math.cos(r_angle)
+    _y = dist_a * math.sin(r_angle)
     return(_x, _y)
 
 def get_distance(_x0, _y0, _x1, _y1):
@@ -228,9 +220,7 @@ def process_data(inputs):
     if get_cur_state()  == 'initial':
         InitialData['heading'] = heading
         InitialData['altitude'] = altitude
-        # y, east
         InitialData['latitude'] = latitude
-        # x, north
         InitialData['longitude'] = longitude
 
         SetPoints['altitude'] = InitialData['altitude']
@@ -258,22 +248,20 @@ def process_data(inputs):
             next_state()
 
     if get_cur_state() == 'turn':
-        if not get_cur_flag():
-            SetPoints['heading'] = (SetPoints['heading'] + get_cur_arg()) % 360
-            SetPoints['bank'] = math.copysign(Data['turnbank'], -get_cur_arg())
-            set_cur_flag(True)
+        SetPoints['heading'] = abs(get_cur_arg())
+        SetPoints['bank'] = math.copysign(Data['turnbank'], get_cur_arg())
         heading_diff = get_heading_diff(heading, SetPoints['heading'])
         if abs(heading_diff) < Data['turn_headingdelta']:
             SetPoints['bank'] = 0
             next_state()
 
     if get_cur_state() == 'level':
-        (_x0, _y0) = get_xy_from_lat_lon(latitude, longitude)
+        (_x, _y) = get_xy_from_lat_lon(latitude, longitude)
         (_xa, _ya) = get_cur_arg()
         (_x1, _y1) = get_xy_from_xa_ya(_xa, _ya)
-        SetPoints['heading'] = get_heading(_x0, _y0, _x1, _y1)
+        SetPoints['heading'] = get_heading(_x, _y, _x1, _y1)
 
-        distance = get_distance(_x0, _y0, _x1, _y1)
+        distance = get_distance(_x, _y, _x1, _y1)
         heading_error = get_heading_diff(heading, SetPoints['heading'])
         print("Distance: {}, heading_error: {}".format(distance, heading_error))
         if distance < Data['level_distancedelta']:
@@ -298,3 +286,21 @@ def process_data(inputs):
           .format(heading_dev, altitude_dev, bank_dev, speed_dev))
 
     return out
+
+if __name__ == "__main__":
+    InitialData['heading'] = 270
+    InitialData['altitude'] = 0.0
+    # Palaca sqare 59.939018, 30.316177
+    InitialData['latitude'] = 59.939018
+    InitialData['longitude'] = 30.316177
+    # Admitalty 59.939055, 30.306933
+    ADM_LAT = 59.939055
+    ADM_LON = 30.306933
+    (_x0, _y0) = get_xy_from_lat_lon(InitialData['latitude'],
+                                     InitialData['longitude'])
+    (_x, _y) = get_xy_from_xa_ya(-1000, 0)
+    _h = get_heading(_x0, _y0, _x, _y)
+    print(_h)
+    (_x1, _y1) = get_xy_from_lat_lon(ADM_LAT, ADM_LON)
+    _h = get_heading(_x1, _y1, _x, _y)
+    print(_h)
