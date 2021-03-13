@@ -7,8 +7,8 @@ Data = {}
 SetPoints = {}
 InitialData = {}
 PIDS = {}
-# initial, takeoff, climbing, turn180,
-# level, turn180, descending, landing, stop
+# initial, takeoff, climbing, turn,
+# level, descending, landing, stop
 States = {}
 
 def init():
@@ -25,6 +25,8 @@ def init():
     PIDS['rudder'].output_limits = (-1.0, 1.0)
     PIDS['aileron_level'] = PID(0.01, 0.03, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
+    PIDS['aileron_turn'] = PID(0.01, 0.0, 0.0, setpoint=0)
+    PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['throttle'].output_limits = (0.3, 1.0)
     PIDS['elevator'] = PID(0.001, 0.01, 0.01, setpoint=0)
@@ -35,8 +37,6 @@ def init():
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
     States['program'].append({ 'name': 'turn', 'arg': -90 })
-    # 2000m right to start
-    States['program'].append({ 'name': 'level', 'arg': (-2000, 0) })
     # 2000m right and 4000m back to start
     States['program'].append({ 'name': 'level', 'arg': (-2000, -3000) })
     States['program'].append({ 'name': 'turn', 'arg': -270 })
@@ -72,21 +72,28 @@ def next_state():
 def process_heading(heading_dev):
     """ Sample heading processing """
     rudder = 0.0
-    if get_cur_state() == 'takeoff' or \
-       get_cur_state() == 'level' or \
-       get_cur_state() == 'climbing':
+    if get_cur_state() in ('takeoff', 'level', 'climbing'):
         rudder = PIDS['rudder'](heading_dev)
+    if get_cur_state() in ('turn', 'level'):
+        if abs(heading_dev) < 90:
+            # Gradually decrease bank as heading_diff goes to 0
+            print("Gradually decrease bank")
+            _k = math.atan(math.radians(- heading_dev))
+            SetPoints['bank'] = _k*Data['turnbank']
+            print("SetPoints['bank']: {}".format(SetPoints['bank']))
+        else:
+            print("Set bank")
+            SetPoints['bank'] = math.copysign(Data['turnbank'], get_cur_arg())
     return rudder
 
 def process_bank(bank_dev):
     """ Sample bank processing """
+    aileron = 0.0
     if get_cur_state() == 'turn':
-        if bank_dev >= 0:
-            aileron = 0.0
-        else:
-            aileron = 0.015
-    else:
+        aileron = PIDS['aileron_turn'](bank_dev)
+    elif get_cur_state() == 'level' or get_cur_state() == 'climbing':
         aileron = PIDS['aileron_level'](bank_dev)
+
     return aileron
 
 def process_altitude(altitude_dev):
@@ -204,6 +211,7 @@ def get_runway_center_correction(speed, center_dist):
 def process_data(inputs):
     # pylint: disable=too-many-statements
     # pylint: disable=too-many-locals
+    # pylint: disable=too-many-branches
     """ Main processing function """
     out = {}
 
@@ -214,6 +222,11 @@ def process_data(inputs):
     rpm = int(inputs['RPM'])
     latitude = float(inputs['Latitude'])
     longitude = float(inputs['Longitude'])
+
+    if not get_cur_flag():
+        for pid in PIDS:
+            PIDS[pid].reset()
+        set_cur_flag(True)
 
     print("State: {}".format(get_cur_state()))
 
@@ -249,7 +262,6 @@ def process_data(inputs):
 
     if get_cur_state() == 'turn':
         SetPoints['heading'] = abs(get_cur_arg())
-        SetPoints['bank'] = math.copysign(Data['turnbank'], get_cur_arg())
         heading_diff = get_heading_diff(heading, SetPoints['heading'])
         if abs(heading_diff) < Data['turn_headingdelta']:
             SetPoints['bank'] = 0
