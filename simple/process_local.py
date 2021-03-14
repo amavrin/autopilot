@@ -21,9 +21,11 @@ def error_pause(_s,_t):
 def init():
     """ Init data for local processing """
     Data['takeoffspeed'] = 60.0
-    Data['targetalt'] = 800.0
-    Data['glissadealt'] = 500.0
+    Data['prelanding_speed'] = 75.0
+    Data['glissade_speed'] = 50.0
     Data['targetspeed'] = 150.0
+    Data['targetalt'] = 700.0
+    Data['glissadealt'] = 500.0
     Data['glissadespeed'] = 65.0
     Data['engine_on_rpm'] = 100
     Data['turnbank'] = 40
@@ -39,7 +41,7 @@ def init():
     PIDS['aileron_turn'] = PID(0.01, 0.0, 0.0, setpoint=0)
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
-    PIDS['throttle'].output_limits = (0.2, 1.0)
+    PIDS['throttle'].output_limits = (0.1, 1.0)
     PIDS['elevator'] = PID(0.002, 0.01, 0.01, setpoint=0)
     PIDS['elevator'].output_limits = (-0.1, 0.01)
     States['current'] = 0
@@ -56,9 +58,13 @@ def init():
     States['program'].append({ 'name': 'turn', 'arg': 90 })
     States['program'].append({ 'name': 'level', 'arg': (-700, -6000) })
     States['program'].append({ 'name': 'turn', 'arg': -270 })
-    States['program'].append({ 'name': 'setspeed', 'arg': Data['glissadespeed'] })
     States['program'].append({ 'name': 'setalt', 'arg': Data['glissadealt'] })
+    States['program'].append({ 'name': 'setspeed', 'arg': Data['prelanding_speed'] })
     States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
+    States['program'].append({ 'name': 'turn', 'arg': -270 })
+    States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
+    States['program'].append({ 'name': 'turn', 'arg': -270 })
+    States['program'].append({ 'name': 'setspeed', 'arg': Data['glissadespeed'] })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
     States['program'].append({ 'name': 'stop' })
@@ -92,7 +98,7 @@ def process_heading(heading_dev):
     """ Sample heading processing """
     rudder = 0.0
     _k = 0.0
-    if get_cur_state() == 'takeoff':
+    if get_cur_state() in ('takeoff', 'descending'):
         # Only ise rudder on the runway
         rudder = PIDS['rudder_runway'](heading_dev)
 
@@ -121,16 +127,22 @@ def process_bank(bank_dev):
     aileron = 0.0
     if get_cur_state() == 'turn':
         aileron = PIDS['aileron_turn'](bank_dev)
-    elif get_cur_state() == 'level' or get_cur_state() == 'climbing':
+    elif get_cur_state() in ('level', 'climbing', 'descending'):
         aileron = PIDS['aileron_level'](bank_dev)
 
     return aileron
 
 def process_altitude(altitude_dev):
-    """ Sample altitude processing """
+    """ Altitude processing during flight """
     elevator = 0.0
     if get_cur_state() != 'takeoff':
         elevator = PIDS['elevator'](- altitude_dev)
+    return elevator
+
+def process_climb(climb_dev):
+    """ Altitude processing on glissade """
+    elevator = 0.0
+    elevator = PIDS['elevator'](- climb_dev)
     return elevator
 
 def process_speed(speed_dev):
@@ -252,6 +264,7 @@ def process_data(inputs):
     rpm = int(inputs['RPM'])
     latitude = float(inputs['Latitude'])
     longitude = float(inputs['Longitude'])
+    climb = float(inputs['Climb'])
 
     if not get_cur_flag():
         for pid in PIDS:
@@ -270,6 +283,8 @@ def process_data(inputs):
         SetPoints['bank'] = 0.0
         SetPoints['heading'] = InitialData['heading']
         SetPoints['speed'] = 0.0
+        SetPoints['climb'] = 0.0
+        SetPoints['flaps'] = 0.0
 
         if rpm > Data['engine_on_rpm']:
             next_state()
@@ -317,12 +332,41 @@ def process_data(inputs):
         if abs(heading_error) > Data['level_maxangle']:
             error_pause("can't get to the point", 100)
 
+    if get_cur_state() == 'descending':
+        # Calculate required vertical speed (feet per sec)
+
+        # 1 knot is 1,68781 feet per sec
+        speed_fps = speed * 1.68781
+        # get distance-to-the-start-point/alt ratio. 1 meter is 3,28084 feets
+        (_x, _y) = get_xy_from_lat_lon(latitude, longitude)
+        (land_x, land_y) = get_xy_from_xa_ya(0, 0)
+        distance_to_landpoint = get_distance(_x, _y, land_x, land_y)
+        dist_alt_ratio = distance_to_landpoint * 3.28084 / altitude
+        climb_required = (-1) * speed_fps / dist_alt_ratio
+        SetPoints['climb'] = climb_required
+
+        center_dist = get_runway_center_dist(InitialData['latitude'],
+                          InitialData['longitude'],
+                          latitude, longitude, InitialData['heading'])
+        center_correction = get_runway_center_correction(speed, center_dist)
+        SetPoints['heading'] = InitialData['heading'] + center_correction
+
+        print("_x: {:+05.2f}, _y: {:+05.2f}".format(_x, _y))
+        print("to land: {:+08.2f}, heading: {:+05.2f}"
+              .format(distance_to_landpoint, SetPoints['heading']))
+
+        SetPoints['flaps'] = 0.5
+        SetPoints['speed'] = Data['glissade_speed']
+
     heading_dev = get_heading_diff(SetPoints['heading'], heading)
     out['rudder'] = process_heading(heading_dev)
 
-    # Climb to preset altitude
     altitude_dev = altitude - SetPoints['altitude']
-    out['elevator'] = process_altitude(altitude_dev)
+    climb_dev = climb - SetPoints['climb']
+    if get_cur_state() != 'descending':
+        out['elevator'] = process_altitude(altitude_dev)
+    if get_cur_state() == 'descending':
+        out['elevator'] = process_climb(climb_dev)
 
     bank_dev = bank - SetPoints['bank']
     out['aileron'] = process_bank(bank_dev)
@@ -330,11 +374,14 @@ def process_data(inputs):
     speed_dev = speed - SetPoints['speed']
     out['throttle'] = process_speed(speed_dev)
 
-    print("Deviations: Heading {:+06.2f}, altitude {:+06.2f}, bank {:+06.2f}, speed {:+06.2f}"
-          .format(heading_dev, altitude_dev, bank_dev, speed_dev))
+    out['flaps'] = SetPoints['flaps']
+
+    print("Deviations: Heading {:+06.2f}, altitude {:+06.2f},"
+          "bank {:+06.2f}, speed {:+06.2f}, climb {:+06.2f}"
+          .format(heading_dev, altitude_dev, bank_dev, speed_dev, climb_dev))
 
     return out
 
 if __name__ == "__main__":
-    _h = get_heading_diff(40,30)
-    print(_h)
+    _d = get_distance(-3976.07,+3.18,-4000.00,+0.00)
+    print(_d)
