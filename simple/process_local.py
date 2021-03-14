@@ -22,7 +22,9 @@ def init():
     """ Init data for local processing """
     Data['takeoffspeed'] = 60.0
     Data['targetalt'] = 800.0
+    Data['glissadealt'] = 500.0
     Data['targetspeed'] = 150.0
+    Data['glissadespeed'] = 65.0
     Data['engine_on_rpm'] = 100
     Data['turnbank'] = 40
     Data['turn_headingdelta'] = 0.5
@@ -44,6 +46,7 @@ def init():
     States['program'] = []
     States['program'].append({ 'name': 'initial' })
     States['program'].append({ 'name': 'setspeed', 'arg': Data['targetspeed'] })
+    States['program'].append({ 'name': 'setalt', 'arg': Data['targetalt'] })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
     States['program'].append({ 'name': 'level', 'arg': (0, 5000) })
@@ -51,8 +54,11 @@ def init():
     # 2000m right and 4000m back to start
     States['program'].append({ 'name': 'level', 'arg': (-700, -3000) })
     States['program'].append({ 'name': 'turn', 'arg': 90 })
-    States['program'].append({ 'name': 'level', 'arg': (-700, -5000) })
+    States['program'].append({ 'name': 'level', 'arg': (-700, -6000) })
     States['program'].append({ 'name': 'turn', 'arg': -270 })
+    States['program'].append({ 'name': 'setspeed', 'arg': Data['glissadespeed'] })
+    States['program'].append({ 'name': 'setalt', 'arg': Data['glissadealt'] })
+    States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
     States['program'].append({ 'name': 'descending' })
     States['program'].append({ 'name': 'landing' })
     States['program'].append({ 'name': 'stop' })
@@ -268,6 +274,10 @@ def process_data(inputs):
         if rpm > Data['engine_on_rpm']:
             next_state()
 
+    if get_cur_state() == 'setalt':
+        SetPoints['altitude'] = get_cur_arg()
+        next_state()
+
     if get_cur_state() == 'setspeed':
         SetPoints['speed'] = get_cur_arg()
         next_state()
@@ -280,7 +290,6 @@ def process_data(inputs):
         SetPoints['heading'] = InitialData['heading'] + center_correction
 
         if speed > Data['takeoffspeed']:
-            SetPoints['altitude'] = Data['targetalt']
             next_state()
 
     if get_cur_state() == 'climbing':
