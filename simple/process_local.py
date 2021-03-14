@@ -39,7 +39,7 @@ def init():
     PIDS['aileron_turn'] = PID(0.01, 0.0, 0.0, setpoint=0)
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
-    PIDS['throttle'].output_limits = (0.3, 1.0)
+    PIDS['throttle'].output_limits = (0.2, 1.0)
     PIDS['elevator'] = PID(0.002, 0.01, 0.01, setpoint=0)
     PIDS['elevator'].output_limits = (-0.1, 0.01)
     States['current'] = 0
