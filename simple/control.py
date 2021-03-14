@@ -19,9 +19,9 @@ def receiver(sock):
         var, val = _p.split("=")
         res[var] = val
 
-    print("Speed: {}, Heading: {}, Altitude: {}, Climb: {}, Pitch: {}, Bank: {}, RPM: {}"
+    print("Speed: {}, Head: {}, Alt: {}, Climb: {}, Pitch: {}, Bank: {}, RPM: {}, Lat: {}, Lon: {}"
           .format(res['Speed'], res['Heading'], res['Altitude'], res['Climb'],
-                  res['Pitch'], res['Bank'], res['RPM']))
+                  res['Pitch'], res['Bank'], res['RPM'], res['Latitude'], res['Longitude']))
     return res
 
 def sender(snd_sock, aileron, elevator, rudder, throttle):
