@@ -32,9 +32,9 @@ def init():
     Data['level_maxangle'] = 45
     PIDS['rudder_runway'] = PID(0.01, 0.005, 0.001, setpoint=0)
     PIDS['rudder_runway'].output_limits = (-1.0, 1.0)
-    PIDS['rudder_flight'] = PID(0.01, 0.002, 0.001, setpoint=0)
+    PIDS['rudder_flight'] = PID(0.01, 0.004, 0.001, setpoint=0)
     PIDS['rudder_flight'].output_limits = (-0.5, 0.5)
-    PIDS['aileron_level'] = PID(0.02, 0.01, 0.01, setpoint=0)
+    PIDS['aileron_level'] = PID(0.04, 0.01, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
     PIDS['aileron_turn'] = PID(0.01, 0.0, 0.0, setpoint=0)
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
@@ -97,12 +97,12 @@ def process_heading(heading_dev):
         rudder = PIDS['rudder_runway'](heading_dev)
 
     if get_cur_state() in ('level', 'climbing', 'turn'):
-        if abs(heading_dev) < 90:
+        if abs(heading_dev) < 60:
             rudder = PIDS['rudder_flight'](heading_dev)
             if abs(heading_dev) > Data['turn_headingdelta']:
                 # Heading error is average, gradually set bank
                 #PIDS['rudder_flight'].auto_mode = False
-                _k = math.atan(math.radians(- heading_dev))
+                _k = 1.25 * math.atan(math.radians(- heading_dev))
             print("Gradually set _k for heading_dev {}: {}".format(heading_dev, _k))
         elif get_cur_state() == 'turn':
             # Set bank to turnbank with the respect to required direction
