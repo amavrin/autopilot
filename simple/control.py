@@ -24,9 +24,10 @@ def receiver(sock):
                   res['Pitch'], res['Bank'], res['RPM'], res['Latitude'], res['Longitude']))
     return res
 
-def sender(snd_sock, aileron, elevator, rudder, throttle):
+def sender(snd_sock, aileron, elevator, rudder, throttle, flaps):
+    # pylint: disable=too-many-arguments
     """ UDP Sender """
-    data_str = '{:.3f}:{:.3f}:{:.3f}:{:.3f}'.format(aileron,elevator,rudder,throttle)
+    data_str = "{:.3f}:{:.3f}:{:.3f}:{:.3f}:{:.3f}".format(aileron,elevator,rudder,throttle,flaps)
     print(data_str)
     data = str.encode(data_str + "\n")
     snd_sock.sendto(data, (FG_ADDR, FG_PORT))
@@ -53,7 +54,8 @@ def main():
         sender(snd_sock,outputs['aileron'],
                         outputs['elevator'],
                         outputs['rudder'],
-                        outputs['throttle'])
+                        outputs['throttle'],
+                        outputs['flaps'])
 
 if __name__ == "__main__":
     main()
