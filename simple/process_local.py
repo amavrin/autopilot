@@ -9,6 +9,7 @@ SetPoints = {}
 InitialData = {}
 PIDS = {}
 # initial, takeoff, climbing, turn,
+# setspeed
 # level, descending, landing, stop
 States = {}
 
@@ -19,7 +20,7 @@ def error_pause(_s,_t):
 
 def init():
     """ Init data for local processing """
-    Data['takeoffspeed'] = 50.0
+    Data['takeoffspeed'] = 60.0
     Data['targetalt'] = 800.0
     Data['targetspeed'] = 150.0
     Data['engine_on_rpm'] = 100
@@ -42,7 +43,7 @@ def init():
     States['current'] = 0
     States['program'] = []
     States['program'].append({ 'name': 'initial' })
-    States['program'].append({ 'name': 'climbing' })
+    States['program'].append({ 'name': 'setspeed', 'arg': Data['targetspeed'] })
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
     States['program'].append({ 'name': 'level', 'arg': (0, 5000) })
@@ -260,15 +261,18 @@ def process_data(inputs):
         InitialData['longitude'] = longitude
 
         SetPoints['altitude'] = InitialData['altitude']
-        SetPoints['speed'] = Data['targetspeed']
         SetPoints['bank'] = 0.0
         SetPoints['heading'] = InitialData['heading']
+        SetPoints['speed'] = 0.0
 
         if rpm > Data['engine_on_rpm']:
             next_state()
 
+    if get_cur_state() == 'setspeed':
+        SetPoints['speed'] = get_cur_arg()
+        next_state()
+
     if get_cur_state() == 'takeoff':
-        SetPoints['speed'] = Data['targetspeed']
         center_dist = get_runway_center_dist(InitialData['latitude'],
                           InitialData['longitude'],
                           latitude, longitude, InitialData['heading'])
