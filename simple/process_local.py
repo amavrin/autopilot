@@ -28,8 +28,8 @@ def init():
     Data['targetalt'] = 700.0
     Data['landingalt'] = 30.0
     Data['dropspeed_ground_alt'] = 3.0
-    Data['glissadealt'] = 500.0
-    Data['glissadespeed'] = 40.0
+    Data['glissadealt'] = 250.0
+    Data['glissadespeed'] = 50.0
     Data['engine_on_rpm'] = 100
     Data['turnbank'] = 40
     Data['turn_headingdelta'] = 0.5
@@ -57,15 +57,15 @@ def init():
     States['program'] = []
     States['program'].append({ 'name': 'initial' })
 
-    States['program'].append({ 'name': 'setspeed', 'arg': 75 })
-    States['program'].append({ 'name': 'setalt', 'arg': 100 })
-    States['program'].append({ 'name': 'takeoff' })
-    States['program'].append({ 'name': 'climbing' })
-    States['program'].append({ 'name': 'setspeed', 'arg': Data['glissadespeed'] })
-    States['program'].append({ 'name': 'level', 'arg': (0, 2000) })
-    States['program'].append({ 'name': 'descending', 'arg': (0,2500) })
-    States['program'].append({ 'name': 'landing' })
-    States['program'].append({ 'name': 'stop' })
+    #States['program'].append({ 'name': 'setspeed', 'arg': 75 })
+    #States['program'].append({ 'name': 'setalt', 'arg': 100 })
+    #States['program'].append({ 'name': 'takeoff' })
+    #States['program'].append({ 'name': 'climbing' })
+    #States['program'].append({ 'name': 'setspeed', 'arg': Data['glissadespeed'] })
+    #States['program'].append({ 'name': 'level', 'arg': (0, 2000) })
+    ##States['program'].append({ 'name': 'descending', 'arg': (0,2500) })
+    #States['program'].append({ 'name': 'landing', 'arg': (0,3500) })
+    #States['program'].append({ 'name': 'stop' })
 
     States['program'].append({ 'name': 'setspeed', 'arg': Data['targetspeed'] })
     States['program'].append({ 'name': 'setalt', 'arg': Data['targetalt'] })
@@ -88,8 +88,8 @@ def init():
     States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
     # Adjust heading
     States['program'].append({ 'name': 'turn', 'arg': -270 })
-    States['program'].append({ 'name': 'descending', 'arg': (0,0) })
-    States['program'].append({ 'name': 'landing' })
+    #States['program'].append({ 'name': 'descending', 'arg': (0,0) })
+    States['program'].append({ 'name': 'landing', 'arg': (0,0) })
     States['program'].append({ 'name': 'stop' })
 
 def get_cur_state():
@@ -257,21 +257,16 @@ def get_heading_diff(_h1, _h2):
 
 def get_runway_center_dist(_lat, _lon, _a0):
     """ Calculate distance from runway center to the plane """
-    # Starting point
-    (_x0, _y0) = get_xy_from_xa_ya(0, 0)
     # Current plane point
     (_x, _y) = get_xy_from_lat_lon(_lat, _lon)
 
-    delta_x = _x - _x0
-    delta_y = _y - _y0
-
-    r_angle_to_plane = math.atan2(delta_y, delta_x)
+    r_angle_to_plane = math.atan2(_y, _x)
     angle_to_plane = math.degrees(r_angle_to_plane)
     _a1 = angle_to_heading(angle_to_plane)
     # angle from runway center to direction to plane
-    _a_delta = get_heading_diff(_a1, _a0)
+    _a_delta = get_heading_diff(_a0, _a1)
 
-    distance_from_start = get_distance(_x0, _y0, _x, _y)
+    distance_from_start = get_distance(0, 0, _x, _y)
     center_dev = distance_from_start * math.tan(math.radians(_a_delta))
     return center_dev
 
@@ -388,7 +383,7 @@ def process_data(inputs):
 
         distance = get_distance(_x, _y, _x1, _y1)
         heading_error = get_heading_diff(heading, SetPoints['heading'])
-        print("Distance: {}, heading_error: {}".format(distance, heading_error))
+        print("Distance: {:5.2f}, heading_error: {:+05.2f}".format(distance, heading_error))
         if distance < Data['level_distancedelta']:
             next_state()
         if abs(heading_error) > Data['level_maxangle']:
@@ -416,7 +411,10 @@ def process_data(inputs):
             next_state()
 
     if get_cur_state() == 'landing':
-        SetPoints['flaps'] = 1.0
+        (land_x, land_y) = get_cur_arg()
+        SetPoints['climb'] = get_required_climbing(land_x, land_y,
+                             latitude, longitude, speed, altitude)
+        SetPoints['flaps'] = 0.5
         SetPoints['pitch'] = 7.0
         SetPoints['heading'] = get_runway_center_heading(latitude, longitude, speed)
         if ground_alt < InitialData['ground_alt'] + Data['dropspeed_ground_alt']:
@@ -433,6 +431,9 @@ def process_data(inputs):
     altitude_dev = altitude - SetPoints['altitude']
     climb_dev = climb - SetPoints['climb']
     pitch_dev = pitch - SetPoints['pitch']
+    bank_dev = bank - SetPoints['bank']
+    speed_dev = speed - SetPoints['speed']
+
     if get_cur_state() not in ('descending', 'landing'):
         out['elevator'] = process_altitude(altitude_dev)
     if get_cur_state() == 'descending':
@@ -440,11 +441,12 @@ def process_data(inputs):
     if get_cur_state() == 'landing':
         out['elevator'] = process_pitch(pitch_dev)
 
-    bank_dev = bank - SetPoints['bank']
     out['aileron'] = process_bank(bank_dev)
 
-    speed_dev = speed - SetPoints['speed']
-    out['throttle'] = process_speed(speed_dev)
+    if get_cur_state() != 'landing':
+        out['throttle'] = process_speed(speed_dev)
+    if get_cur_state() == 'landing':
+        out['throttle'] = process_speed(climb_dev)
 
     out['flaps'] = SetPoints['flaps']
 
@@ -455,5 +457,7 @@ def process_data(inputs):
     return out
 
 if __name__ == "__main__":
-    _d = get_distance(-3976.07,+3.18,-4000.00,+0.00)
+    _A0 = 110
+    _A1 = 270
+    _d = get_heading_diff(_A1, _A0)
     print(_d)
