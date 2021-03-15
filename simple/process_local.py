@@ -57,15 +57,15 @@ def init():
     States['program'] = []
     States['program'].append({ 'name': 'initial' })
 
-    #States['program'].append({ 'name': 'setspeed', 'arg': 75 })
-    #States['program'].append({ 'name': 'setalt', 'arg': 100 })
-    #States['program'].append({ 'name': 'takeoff' })
-    #States['program'].append({ 'name': 'climbing' })
-    #States['program'].append({ 'name': 'setspeed', 'arg': Data['glissadespeed'] })
-    #States['program'].append({ 'name': 'level', 'arg': (0, 2000) })
-    #States['program'].append({ 'name': 'descending', 'arg': (0,2500) })
-    #States['program'].append({ 'name': 'landing' })
-    #States['program'].append({ 'name': 'stop' })
+    States['program'].append({ 'name': 'setspeed', 'arg': 75 })
+    States['program'].append({ 'name': 'setalt', 'arg': 100 })
+    States['program'].append({ 'name': 'takeoff' })
+    States['program'].append({ 'name': 'climbing' })
+    States['program'].append({ 'name': 'setspeed', 'arg': Data['glissadespeed'] })
+    States['program'].append({ 'name': 'level', 'arg': (0, 2000) })
+    States['program'].append({ 'name': 'descending', 'arg': (0,2500) })
+    States['program'].append({ 'name': 'landing' })
+    States['program'].append({ 'name': 'stop' })
 
     States['program'].append({ 'name': 'setspeed', 'arg': Data['targetspeed'] })
     States['program'].append({ 'name': 'setalt', 'arg': Data['targetalt'] })
@@ -290,6 +290,25 @@ def get_runway_center_heading(_lat, _lon, _speed):
     center_heading = InitialData['heading'] + center_correction
     return center_heading
 
+def get_required_climbing(_xa, _ya, _lat, _lon, speed, _alt):
+    """ Calculate climbing required to get to XA, YA
+        from current lat and lon at current speed and altitude """
+    # Calculate required vertical speed (feet per sec)
+
+    # 1 knot is 1,68781 feet per sec
+    speed_fps = speed * 1.68781
+    # get distance-to-the-start-point/alt ratio. 1 meter is 3,28084 feets
+    (_x, _y) = get_xy_from_lat_lon(_lat, _lon)
+    (land_x, land_y) = get_xy_from_xa_ya(_xa, _ya)
+    distance_to_landpoint = get_distance(_x, _y, land_x, land_y)
+    dist_alt_ratio = distance_to_landpoint * 3.28084 / _alt
+    climb_required = (-1) * speed_fps / dist_alt_ratio
+
+    print("to land: {:+08.2f}, heading: {:+05.2f}"
+          .format(distance_to_landpoint, SetPoints['heading']))
+
+    return climb_required
+
 def process_data(inputs):
     # pylint: disable=too-many-statements
     # pylint: disable=too-many-locals
@@ -379,26 +398,20 @@ def process_data(inputs):
         # Calculate required vertical speed (feet per sec)
 
         # 1 knot is 1,68781 feet per sec
-        speed_fps = speed * 1.68781
         # get distance-to-the-start-point/alt ratio. 1 meter is 3,28084 feets
-        (_x, _y) = get_xy_from_lat_lon(latitude, longitude)
         (land_xa, land_ya) = get_cur_arg()
-        (land_x, land_y) = get_xy_from_xa_ya(land_xa, land_ya)
-        distance_to_landpoint = get_distance(_x, _y, land_x, land_y)
-        dist_alt_ratio = distance_to_landpoint * 3.28084 / altitude
-        climb_required = (-1) * speed_fps / dist_alt_ratio
-        SetPoints['climb'] = climb_required
+        SetPoints['climb'] = get_required_climbing(land_xa, land_ya,
+                                                latitude, longitude,
+                                                speed, altitude)
 
         SetPoints['heading'] = get_runway_center_heading(latitude, longitude, speed)
 
-        print("to land: {:+08.2f}, heading: {:+05.2f}"
-              .format(distance_to_landpoint, SetPoints['heading']))
 
 
         if ground_alt < 10 * Data['landingalt']:
             SetPoints['flaps'] = 0.75
             SetPoints['speed'] = Data['landing_speed']
-            SetPoints['climb'] = climb_required / 3
+            SetPoints['climb'] = SetPoints['climb'] / 3
         if ground_alt < Data['landingalt']:
             next_state()
 
