@@ -36,27 +36,40 @@ def process_data(inputs):
     mb_altitude = wordswap(float(inputs['Altitude']))
     mb_bank = wordswap(float(inputs['Bank']))
 
-    mb_engine = int(inputs['RPM'])
+    mb_rpm = int(inputs['RPM'])
+
+    mb_climb = wordswap(float(inputs['Climb']))
+    mb_pitch = wordswap(float(inputs['Pitch']))
+    mb_latitude = wordswap(float(inputs['Latitude']))
+    mb_longitude = wordswap(float(inputs['Longitude']))
+    mb_elevation = wordswap(float(inputs['Elevation']))
+
+    _m = MODBUS['master'].execute(1, cst.READ_INPUT_REGISTERS,
+                 40960, 10,
+                 data_format='>fffff')
 
     MODBUS['master'].execute(1, cst.WRITE_MULTIPLE_REGISTERS,
-                   starting_address=0,
+                   starting_address=41984,
                    output_value=[mb_speed, mb_heading, mb_altitude, mb_bank],
                    data_format='>ffff')
 
     MODBUS['master'].execute(1, cst.WRITE_MULTIPLE_REGISTERS,
-                   starting_address=8,
-                   output_value=[mb_engine],
+                   starting_address=41992,
+                   output_value=[mb_rpm],
                    data_format='>h')
 
-    _m = MODBUS['master'].execute(1, cst.READ_INPUT_REGISTERS,
-                 0, 8,
-                 data_format='>ffff')
+    MODBUS['master'].execute(1, cst.WRITE_MULTIPLE_REGISTERS,
+                   starting_address=41993,
+                   output_value=[mb_climb, mb_pitch, mb_latitude, mb_longitude, mb_elevation],
+                   data_format='>fffff')
+
 
     ret = {}
     ret['throttle'] = wordswap(_m[0])
     ret['rudder'] = wordswap(_m[1])
     ret['elevator'] = wordswap(_m[2])
     ret['aileron'] = wordswap(_m[3])
+    ret['flaps'] = wordswap(_m[3])
 
     return ret
 
