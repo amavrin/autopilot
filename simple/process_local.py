@@ -184,18 +184,18 @@ def process_speed_landing(climb_dev):
 
 def get_xy_from_lat_lon(_lat, _lon):
     """ Calculate relative X and Y based on latitude and longitude """
-    r_lat = math.radians(_lat - InitialData['latitude'])
-    r_lon = math.radians(_lon - InitialData['longitude'])
-    _x = 6371000 * r_lon * math.cos(r_lat)
-    _y = 6371000 * r_lat
+    r_lat_local = math.radians(_lat - InitialData['latitude'])
+    r_lon_local = math.radians(_lon - InitialData['longitude'])
+    _x = 6371000 * r_lon_local * math.cos(math.radians(InitialData['latitude']))
+    _y = 6371000 * r_lat_local
     return (_x, _y)
 
 def get_lat_lon_from_xy(_x, _y):
     """ Calculate lat and lon from X and Y """
-    r_lat = _y / 6371000
-    r_lon = _x / 6371000 / math.cos(r_lat)
-    lat = math.degrees(r_lat) + InitialData['latitude']
-    lon = math.degrees(r_lon) + InitialData['longitude']
+    r_lat_local = _y / 6371000
+    r_lon_local = _x / 6371000 / math.cos(r_lat_local + InitialData['latitude'])
+    lat = math.degrees(r_lat_local) + InitialData['latitude']
+    lon = math.degrees(r_lon_local) + InitialData['longitude']
     return (lat, lon)
 
 def heading_to_angle(_h):
