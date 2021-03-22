@@ -5,8 +5,8 @@ import struct
 import modbus_tk.defines as cst
 import modbus_tk.modbus_tcp as modbus_tcp
 
-#CONTROLLER = "78.107.114.6"
-CONTROLLER = "192.162.193.94"
+CONTROLLER = "78.107.114.6"
+#CONTROLLER = "192.162.193.94"
 
 MODBUS = {}
 
@@ -45,7 +45,7 @@ def process_data(inputs):
     mb_elevation = wordswap(float(inputs['Elevation']))
 
     _m = MODBUS['master'].execute(1, cst.READ_INPUT_REGISTERS,
-                 40960, 10,
+                 40962, 10,
                  data_format='>fffff')
 
     MODBUS['master'].execute(1, cst.WRITE_MULTIPLE_REGISTERS,
@@ -65,11 +65,11 @@ def process_data(inputs):
 
 
     ret = {}
-    ret['throttle'] = wordswap(_m[0])
-    ret['rudder'] = wordswap(_m[1])
-    ret['elevator'] = wordswap(_m[2])
-    ret['aileron'] = wordswap(_m[3])
+    ret['rudder'] = wordswap(_m[0])
+    ret['elevator'] = wordswap(_m[1])
+    ret['aileron'] = wordswap(_m[2])
     ret['flaps'] = wordswap(_m[3])
+    ret['throttle'] = wordswap(_m[4])
 
     return ret
 
