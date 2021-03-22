@@ -190,10 +190,11 @@ def get_xy_from_lat_lon(_lat, _lon):
     _y = 6371000 * r_lat_local
     return (_x, _y)
 
+# Unused, not tested
 def get_lat_lon_from_xy(_x, _y):
     """ Calculate lat and lon from X and Y """
     r_lat_local = _y / 6371000
-    r_lon_local = _x / 6371000 / math.cos(r_lat_local + InitialData['latitude'])
+    r_lon_local = _x / 6371000 / math.cos(r_lat_local + math.radians(InitialData['latitude']))
     lat = math.degrees(r_lat_local) + InitialData['latitude']
     lon = math.degrees(r_lon_local) + InitialData['longitude']
     return (lat, lon)
@@ -247,7 +248,7 @@ def get_heading(_x0, _y0, _x1, _y1):
     return heading
 
 def get_heading_diff(_h1, _h2):
-    """ Calculate heading difference """
+    """ Calculate heading difference from _h1 to _h2 """
     _h1 = _h1 % 360
     _h2 = _h2 % 360
     hdiff = _h2 - _h1 + (_h2 < _h1) * 360
@@ -469,14 +470,6 @@ def process_data(inputs):
     return out
 
 if __name__ == "__main__":
-    InitialData = {}
-    InitialData['heading'] = 270
-    InitialData['latitude'] = 021.32524395239
-    InitialData['longitude'] = -157.90714072658
-
-    _h = get_runway_center_heading(021.32539760539, -157.90969340281, 100)
-    print(_h)
-
     _h = get_heading_diff(270, 180)
     print(_h)
     _h = get_heading_diff2(270, 180, 'left')
