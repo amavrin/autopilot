@@ -4,6 +4,7 @@
 import argparse
 import importlib
 import socket
+import sys
 
 LISTEN_PORT=10000
 LISTEN_ADDR='127.0.0.1'
@@ -19,8 +20,8 @@ def receiver(sock):
         var, val = _p.split("=")
         res[var] = val
 
-    print("Speed: {}, Head: {}, Alt: {}, Climb: {}, Pitch: {}, Bank: {},"
-          "RPM: {}, Lat: {}, Lon: {}, Elev: {}"
+    sys.stdout.write("Speed: {}, Head: {}, Alt: {}, Climb: {}, Pitch: {}, Bank: {},"
+          "RPM: {}, Lat: {}, Lon: {}, Elev: {} "
           .format(res['Speed'], res['Heading'], res['Altitude'], res['Climb'],
                   res['Pitch'], res['Bank'], res['RPM'], res['Latitude'], res['Longitude'],
                   res['Elevation']))
