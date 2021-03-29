@@ -9,6 +9,6 @@
 --airport=PHNL \
 --httpd=8080 \
 --telnet=1024 \
---generic=socket,out,3,localhost,10000,udp,output \
---generic=socket,in,3,localhost,10001,udp,input
+--generic=socket,out,4,localhost,10000,udp,output \
+--generic=socket,in,4,localhost,10001,udp,input
 
