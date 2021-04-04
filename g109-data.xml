@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+
+<PropertyList>
+  <sim>
+    <model>
+      <livery>
+      </livery>
+    </model>
+  </sim>
+  <instrumentation>
+    <comm n="1">
+      <power-btn type="bool">true</power-btn>
+      <volume-selected type="double">0.7</volume-selected>
+      <frequencies>
+        <standby-mhz type="double">127.9</standby-mhz>
+        <selected-mhz type="double">120.9</selected-mhz>
+        <dial-khz type="int">0</dial-khz>
+        <dial-mhz type="int">0</dial-mhz>
+      </frequencies>
+    </comm>
+  </instrumentation>
+</PropertyList>
