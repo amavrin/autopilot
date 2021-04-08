@@ -80,7 +80,6 @@ def init():
     States['program'].append({ 'name': 'takeoff' })
     States['program'].append({ 'name': 'climbing' })
     States['program'].append({ 'name': 'sethead', 'arg': (90, 'left') })
-    # 2000m right and 4000m back to start
     States['program'].append({ 'name': 'level', 'arg': (-700, -3000) })
     States['program'].append({ 'name': 'sethead', 'arg': (90, '') })
     States['program'].append({ 'name': 'level', 'arg': (-700, -6000) })
