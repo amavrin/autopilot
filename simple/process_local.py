@@ -435,11 +435,8 @@ def landing_state():
 
 def process_data(inputs):
     # pylint: disable=too-many-statements
-    # pylint: disable=too-many-locals
     # pylint: disable=too-many-branches
     """ Main processing function """
-    out = {}
-
     CurrentData['heading'] = float(inputs['Heading'])
     CurrentData['speed'] = float(inputs['Speed'])
     CurrentData['altitude'] = float(inputs['Altitude'])
@@ -460,60 +457,39 @@ def process_data(inputs):
 
     print("State: {}".format(get_cur_state()))
 
+    go_next = False
     if get_cur_state()  == 'initial':
-        status = initial_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'setalt':
-        status = setalt_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'setspeed':
-        status = setspeed_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'takeoff':
-        status = takeoff_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'climbing':
-        status = climbing_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'sethead':
-        status = sethead_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'level':
-        status = level_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'descending':
-        status = descending_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'landing':
-        status = landing_state()
-        if status:
-            next_state()
-
-    if get_cur_state() == 'stop':
+        go_next = initial_state()
+    elif get_cur_state() == 'setalt':
+        go_next = setalt_state()
+    elif get_cur_state() == 'setspeed':
+        go_next = setspeed_state()
+    elif get_cur_state() == 'takeoff':
+        go_next = takeoff_state()
+    elif get_cur_state() == 'climbing':
+        go_next = climbing_state()
+    elif get_cur_state() == 'sethead':
+        go_next = sethead_state()
+    elif get_cur_state() == 'level':
+        go_next = level_state()
+    elif get_cur_state() == 'descending':
+        go_next = descending_state()
+    elif get_cur_state() == 'landing':
+        go_next = landing_state()
+    elif get_cur_state() == 'stop':
         print("Brakes!")
+    else:
+        error_pause("Unknown state", 100)
 
+    if go_next:
+        next_state()
+
+    # Calculate deviations
     if get_cur_state() == 'sethead':
         (_, direction) = get_cur_arg()
         heading_dev = get_heading_diff2(CurrentData['heading'], SetPoints['heading'], direction)
     else:
         heading_dev = get_heading_diff(CurrentData['heading'], SetPoints['heading'])
-    out['rudder'] = process_heading(heading_dev)
 
     altitude_dev = CurrentData['altitude'] - SetPoints['altitude']
     climb_dev = CurrentData['climb'] - SetPoints['climb']
@@ -521,19 +497,25 @@ def process_data(inputs):
     bank_dev = CurrentData['bank'] - SetPoints['bank']
     speed_dev = CurrentData['speed'] - SetPoints['speed']
 
-    if get_cur_state() not in ('descending', 'landing'):
-        out['elevator'] = process_altitude(altitude_dev)
-    if get_cur_state() == 'descending':
-        out['elevator'] = process_climb(climb_dev)
-    if get_cur_state() == 'landing':
-        out['elevator'] = process_pitch(pitch_dev)
+
+    # Process deviations
+    out = {}
 
     out['aileron'] = process_bank(bank_dev)
 
-    if get_cur_state() != 'landing':
-        out['throttle'] = process_speed(speed_dev)
+    if get_cur_state() == 'descending':
+        out['elevator'] = process_climb(climb_dev)
+    elif get_cur_state() == 'landing':
+        out['elevator'] = process_pitch(pitch_dev)
+    else:
+        out['elevator'] = process_altitude(altitude_dev)
+
+    out['rudder'] = process_heading(heading_dev)
+
     if get_cur_state() == 'landing':
         out['throttle'] = process_speed(climb_dev)
+    else:
+        out['throttle'] = process_speed(speed_dev)
 
     out['flaps'] = SetPoints['flaps']
 
