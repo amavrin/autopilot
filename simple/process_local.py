@@ -8,6 +8,7 @@ Settings = {}
 SetPoints = {}
 InitialData = {}
 CurrentData = {}
+Diffs = {}
 PIDS = {}
 # initial, takeoff, climbing, sethead,
 # setspeed
@@ -315,6 +316,124 @@ def get_required_climbing(_xa, _ya, _lat, _lon, speed, _alt):
 
     return climb_required
 
+def initial_state():
+    """ Process initial state """
+    InitialData['heading'] = CurrentData['heading']
+    InitialData['altitude'] = CurrentData['altitude']
+    InitialData['elevation'] = CurrentData['elevation']
+    InitialData['ground_alt'] = CurrentData['ground_alt']
+    InitialData['latitude'] = CurrentData['latitude']
+    InitialData['longitude'] = CurrentData['longitude']
+
+    SetPoints['altitude'] = InitialData['altitude']
+    SetPoints['bank'] = 0.0
+    SetPoints['heading'] = InitialData['heading']
+    SetPoints['speed'] = 0.0
+    SetPoints['climb'] = 0.0
+    SetPoints['flaps'] = 0.0
+    SetPoints['pitch'] = 0.0
+
+
+    if CurrentData['rpm'] > Settings['engine_on_rpm']:
+        return True
+    return False
+
+def setalt_state():
+    """ Process set alt state """
+    SetPoints['altitude'] = get_cur_arg()
+    return True
+
+def setspeed_state():
+    """ Process set speed state """
+    SetPoints['speed'] = get_cur_arg()
+    return True
+
+def takeoff_state():
+    """ Process takeoff state """
+    SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
+                                                     CurrentData['longitude'],
+                                                     CurrentData['speed'])
+    if CurrentData['speed'] > Settings['takeoffspeed']:
+        return True
+    return False
+
+def climbing_state():
+    """ Process climbing state """
+    if CurrentData['altitude'] > SetPoints['altitude']:
+        return True
+    return False
+
+def sethead_state():
+    """" Process set heading state """
+    SetPoints['heading'] = get_cur_arg()[0]
+    heading_diff = get_heading_diff(CurrentData['heading'], SetPoints['heading'])
+    if abs(heading_diff) < Settings['turn_headingdelta']:
+        return True
+    return False
+
+def level_state():
+    """" Process level state """
+    (_x, _y) = get_xy_from_lat_lon(CurrentData['latitude'],
+                                       CurrentData['longitude'])
+    (_xa, _ya) = get_cur_arg()
+    (_x1, _y1) = get_xy_from_xa_ya(_xa, _ya)
+    SetPoints['heading'] = get_heading(_x, _y, _x1, _y1)
+
+    distance = get_distance(_x, _y, _x1, _y1)
+    heading_error = get_heading_diff(CurrentData['heading'], SetPoints['heading'])
+    print("Distance: {:5.2f}, heading_error: {:+05.2f}".format(distance, heading_error))
+    if abs(heading_error) > Settings['level_maxangle']:
+        error_pause("can't get to the point", 100)
+    if distance < Settings['level_distancedelta']:
+        return True
+    return False
+
+def descending_state():
+    """ Process descending state """
+    # Calculate required vertical speed (feet per sec)
+
+    # 1 knot is 1,68781 feet per sec
+    # get distance-to-the-start-point/alt ratio. 1 meter is 3,28084 feets
+    (land_xa, land_ya) = get_cur_arg()
+    SetPoints['climb'] = get_required_climbing(land_xa, land_ya,
+                                               CurrentData['latitude'],
+                                               CurrentData['longitude'],
+                                               CurrentData['speed'],
+                                               CurrentData['altitude'])
+
+    SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
+                                                     CurrentData['longitude'],
+                                                     CurrentData['speed'])
+
+
+
+    if CurrentData['ground_alt'] < 10 * Settings['landingalt']:
+        SetPoints['flaps'] = 0.75
+        SetPoints['speed'] = Settings['landing_speed']
+        SetPoints['climb'] = SetPoints['climb'] / 3
+    if CurrentData['ground_alt'] < Settings['landingalt']:
+        return True
+    return False
+
+def landing_state():
+    """ Process landing state """
+    (land_x, land_y) = get_cur_arg()
+    SetPoints['climb'] = get_required_climbing(land_x, land_y,
+                                               CurrentData['latitude'],
+                                               CurrentData['longitude'],
+                                               CurrentData['speed'],
+                                               CurrentData['altitude'])
+    SetPoints['flaps'] = 0.5
+    SetPoints['pitch'] = 7.0
+    SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
+                                                     CurrentData['longitude'],
+                                                     CurrentData['speed'])
+    if CurrentData['ground_alt'] < InitialData['ground_alt'] + Settings['dropspeed_ground_alt']:
+        SetPoints['speed'] = 0
+    if CurrentData['speed'] < 30:
+        return True
+    return False
+
 def process_data(inputs):
     # pylint: disable=too-many-statements
     # pylint: disable=too-many-locals
@@ -343,104 +462,48 @@ def process_data(inputs):
     print("State: {}".format(get_cur_state()))
 
     if get_cur_state()  == 'initial':
-        InitialData['heading'] = CurrentData['heading']
-        InitialData['altitude'] = CurrentData['altitude']
-        InitialData['elevation'] = CurrentData['elevation']
-        InitialData['ground_alt'] = CurrentData['ground_alt']
-        InitialData['latitude'] = CurrentData['latitude']
-        InitialData['longitude'] = CurrentData['longitude']
-
-        SetPoints['altitude'] = InitialData['altitude']
-        SetPoints['bank'] = 0.0
-        SetPoints['heading'] = InitialData['heading']
-        SetPoints['speed'] = 0.0
-        SetPoints['climb'] = 0.0
-        SetPoints['flaps'] = 0.0
-        SetPoints['pitch'] = 0.0
-
-        if CurrentData['rpm'] > Settings['engine_on_rpm']:
+        status = initial_state()
+        if status:
             next_state()
 
     if get_cur_state() == 'setalt':
-        SetPoints['altitude'] = get_cur_arg()
-        next_state()
+        status = setalt_state()
+        if status:
+            next_state()
 
     if get_cur_state() == 'setspeed':
-        SetPoints['speed'] = get_cur_arg()
-        next_state()
+        status = setspeed_state()
+        if status:
+            next_state()
 
     if get_cur_state() == 'takeoff':
-        SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
-                                                         CurrentData['longitude'],
-                                                         CurrentData['speed'])
-
-        if CurrentData['speed'] > Settings['takeoffspeed']:
+        status = takeoff_state()
+        if status:
             next_state()
 
     if get_cur_state() == 'climbing':
-        if CurrentData['altitude'] > SetPoints['altitude']:
+        status = climbing_state()
+        if status:
             next_state()
 
     if get_cur_state() == 'sethead':
-        SetPoints['heading'] = get_cur_arg()[0]
-        heading_diff = get_heading_diff(CurrentData['heading'], SetPoints['heading'])
-        if abs(heading_diff) < Settings['turn_headingdelta']:
+        status = sethead_state()
+        if status:
             next_state()
 
     if get_cur_state() == 'level':
-        (_x, _y) = get_xy_from_lat_lon(CurrentData['latitude'],
-                                       CurrentData['longitude'])
-        (_xa, _ya) = get_cur_arg()
-        (_x1, _y1) = get_xy_from_xa_ya(_xa, _ya)
-        SetPoints['heading'] = get_heading(_x, _y, _x1, _y1)
-
-        distance = get_distance(_x, _y, _x1, _y1)
-        heading_error = get_heading_diff(CurrentData['heading'], SetPoints['heading'])
-        print("Distance: {:5.2f}, heading_error: {:+05.2f}".format(distance, heading_error))
-        if distance < Settings['level_distancedelta']:
+        status = level_state()
+        if status:
             next_state()
-        if abs(heading_error) > Settings['level_maxangle']:
-            error_pause("can't get to the point", 100)
 
     if get_cur_state() == 'descending':
-        # Calculate required vertical speed (feet per sec)
-
-        # 1 knot is 1,68781 feet per sec
-        # get distance-to-the-start-point/alt ratio. 1 meter is 3,28084 feets
-        (land_xa, land_ya) = get_cur_arg()
-        SetPoints['climb'] = get_required_climbing(land_xa, land_ya,
-                                                CurrentData['latitude'],
-                                                CurrentData['longitude'],
-                                                CurrentData['speed'],
-                                                CurrentData['altitude'])
-
-        SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
-                                                         CurrentData['longitude'],
-                                                         CurrentData['speed'])
-
-
-
-        if CurrentData['ground_alt'] < 10 * Settings['landingalt']:
-            SetPoints['flaps'] = 0.75
-            SetPoints['speed'] = Settings['landing_speed']
-            SetPoints['climb'] = SetPoints['climb'] / 3
-        if CurrentData['ground_alt'] < Settings['landingalt']:
+        status = descending_state()
+        if status:
             next_state()
 
     if get_cur_state() == 'landing':
-        (land_x, land_y) = get_cur_arg()
-        SetPoints['climb'] = get_required_climbing(land_x, land_y,
-                             CurrentData['latitude'],
-                             CurrentData['longitude'], CurrentData['speed'],
-                             CurrentData['altitude'])
-        SetPoints['flaps'] = 0.5
-        SetPoints['pitch'] = 7.0
-        SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
-                                                         CurrentData['longitude'],
-                                                         CurrentData['speed'])
-        if CurrentData['ground_alt'] < InitialData['ground_alt'] + Settings['dropspeed_ground_alt']:
-            SetPoints['speed'] = 0
-        if CurrentData['speed'] < 30:
+        status = landing_state()
+        if status:
             next_state()
 
     if get_cur_state() == 'stop':
