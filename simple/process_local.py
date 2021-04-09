@@ -56,11 +56,9 @@ def init():
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['throttle'].output_limits = (0.005, 1.0)
-    PIDS['elevator_alt'] = PID(0.002, 0.01, 0.01, setpoint=0)
-    PIDS['elevator_alt'].output_limits = (-0.1, 0.01)
     PIDS['elevator_climb'] = PID(0.01, 0.001, 0.002, setpoint=0)
     PIDS['elevator_climb'].output_limits = (-0.2, 0.1)
-    PIDS['elevator_pitch'] = PID(0.04, 0.02, 0.1, setpoint=0)
+    PIDS['elevator_pitch'] = PID(0.02, 0.01, 0.1, setpoint=0)
     PIDS['elevator_pitch'].output_limits = (-0.3, 0.1)
     States['current'] = 0
     States['program'] = []
@@ -222,13 +220,6 @@ def process_altitude(altitude_dev):
         SetPoints['climb'] = clip(climb, -10, 10)
     elif get_cur_state() in ('initial', 'takeoff'):
         SetPoints['climb'] = 0.0
-
-def process_altitude_orig(altitude_dev):
-    """ Altitude processing during flight """
-    elevator = 0.0
-    if get_cur_state() not in ('takeoff', 'landing'):
-        elevator = PIDS['elevator_alt'](- altitude_dev)
-    return elevator
 
 def process_climb(climb_dev):
     """ Altitude processing on glissade """
