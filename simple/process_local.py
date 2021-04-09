@@ -40,7 +40,7 @@ def init():
     Settings['glissadealt'] = 250.0
     Settings['glissadespeed'] = 50.0
     Settings['engine_on_rpm'] = 100
-    Settings['turnbank'] = 25
+    Settings['turnbank'] = 30
     Settings['turn_headingdelta'] = 3
     Settings['level_distancedelta'] = 40
     Settings['level_maxangle'] = 359
@@ -198,7 +198,7 @@ def process_heading(heading_dev):
 
     if get_cur_state() in ('level', 'climbing', 'sethead'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
-        k_prop_rudder = bellshape(heading_dev, 50, zero = False)
+        k_prop_rudder = bellshape(heading_dev, 20, zero = False)
         rudder = k_prop_rudder * PIDS['rudder_flight'](-heading_dev)
 
         # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
