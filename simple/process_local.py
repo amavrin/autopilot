@@ -48,7 +48,7 @@ def init():
     PIDS['rudder_runway'].output_limits = (-1.0, 1.0)
     PIDS['rudder_landing'] = PID(0.02, 0.01, 0.02, setpoint=0)
     PIDS['rudder_landing'].output_limits = (-0.5, 0.5)
-    PIDS['rudder_flight'] = PID(0.02, 0.0, 0.0, setpoint=0)
+    PIDS['rudder_flight'] = PID(0.02, 0.001, 0.0, setpoint=0)
     PIDS['rudder_flight'].output_limits = (-0.5, 0.5)
     PIDS['aileron_level'] = PID(0.04, 0.01, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
@@ -202,7 +202,7 @@ def process_heading(heading_dev):
         rudder = k_prop_rudder * PIDS['rudder_flight'](-heading_dev)
 
         # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
-        k_prop_aileron = s_shape(heading_dev, 15)
+        k_prop_aileron = s_shape(heading_dev, 8)
         SetPoints['bank'] = k_prop_aileron*Settings['turnbank']
 
     return rudder
