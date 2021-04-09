@@ -58,6 +58,8 @@ def init():
     PIDS['throttle'].output_limits = (0.005, 1.0)
     PIDS['elevator_climb'] = PID(0.01, 0.001, 0.002, setpoint=0)
     PIDS['elevator_climb'].output_limits = (-0.2, 0.1)
+    PIDS['elevator_climb_highspeed'] = PID(0.005, 0.0005, 0.002, setpoint=0)
+    PIDS['elevator_climb_highspeed'].output_limits = (-0.2, 0.1)
     PIDS['elevator_pitch'] = PID(0.02, 0.01, 0.1, setpoint=0)
     PIDS['elevator_pitch'].output_limits = (-0.3, 0.1)
     States['current'] = 0
@@ -223,7 +225,12 @@ def process_altitude(altitude_dev):
 
 def process_climb(climb_dev):
     """ Altitude processing on glissade """
-    elevator = PIDS['elevator_climb'](- climb_dev)
+    if CurrentData['speed'] < 100:
+        elevator = PIDS['elevator_climb'](- climb_dev)
+        PIDS['elevator_climb_highspeed'].reset()
+    else:
+        elevator = PIDS['elevator_climb_highspeed'](- climb_dev)
+        PIDS['elevator_climb'].reset()
     return elevator
 
 def process_pitch(pitch_dev):
