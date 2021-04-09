@@ -16,10 +16,10 @@ PIDS = {}
 # level, descending, landing, stop
 States = {}
 
-#PROGRAM = 'round'
+PROGRAM = 'round'
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
-PROGRAM = 'zig_zag'
+#PROGRAM = 'zig_zag'
 #PROGRAM = 'turns'
 
 def error_pause(_s,_t):
@@ -31,13 +31,13 @@ def init():
     # pylint: disable=too-many-statements
     """ Init data for local processing """
     Settings['takeoffspeed'] = 60.0
-    Settings['prelanding_speed'] = 75.0
+    Settings['prelanding_speed'] = 60.0
     Settings['landing_speed'] = 30.0
     Settings['targetspeed'] = 150.0
     Settings['targetalt'] = 700.0
-    Settings['landingalt'] = 30.0
+    Settings['landingalt'] = 100.0
     Settings['dropspeed_ground_alt'] = 3.0
-    Settings['glissadealt'] = 250.0
+    Settings['glissadealt'] = 450.0
     Settings['glissadespeed'] = 50.0
     Settings['engine_on_rpm'] = 100
     Settings['turnbank'] = 30
@@ -113,8 +113,6 @@ def init():
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'sethead', 'arg': (90, 'left') })
-        States['program'].append({ 'name': 'level', 'arg': (-700, -3000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (90, '') })
         States['program'].append({ 'name': 'level', 'arg': (-700, -6000) })
         # Turn to the glissade, take off speed
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
@@ -128,7 +126,7 @@ def init():
         States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
         # Adjust heading
         States['program'].append({ 'name': 'sethead', 'arg': (270, '') })
-        #States['program'].append({ 'name': 'descending', 'arg': (0,0) })
+        States['program'].append({ 'name': 'descending', 'arg': (0,0) })
         States['program'].append({ 'name': 'landing', 'arg': (0,0) })
         States['program'].append({ 'name': 'stop' })
         ################
