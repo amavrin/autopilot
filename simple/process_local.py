@@ -35,11 +35,11 @@ def init():
     Settings['prelanding_speed'] = 60.0
     Settings['targetspeed'] = 150.0
     Settings['targetalt'] = 700.0
-    Settings['landingalt'] = 30.0
-    Settings['landing_speed'] = 45.0
+    Settings['landingalt'] = 40.0
+    Settings['landing_speed'] = 40.0
     Settings['landingpitch'] = 7.0
     Settings['landingclimb'] = -0.3
-    Settings['dropspeed_ground_alt'] = 3.0
+    Settings['dropspeed_ground_alt'] = 4.0
     Settings['glissadealt'] = 450.0
     Settings['glissadespeed'] = 50.0
     Settings['engine_on_rpm'] = 100
@@ -58,8 +58,8 @@ def init():
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['throttle'].output_limits = (0.005, 1.0)
-    PIDS['elevator_climb_middlespeed'] = PID(0.01, 0.004, 0.002, setpoint=0)
-    PIDS['elevator_climb_middlespeed'].output_limits = (-0.2, 0.1)
+    PIDS['elevator_climb_middlespeed'] = PID(0.01, 0.008, 0.002, setpoint=0)
+    PIDS['elevator_climb_middlespeed'].output_limits = (-0.3, 0.1)
     PIDS['elevator_climb_highspeed'] = PID(0.005, 0.0005, 0.002, setpoint=0)
     PIDS['elevator_climb_highspeed'].output_limits = (-0.2, 0.1)
     PIDS['elevator_pitch'] = PID(0.04, 0.005, 0.0, setpoint=0)
@@ -488,14 +488,19 @@ def landing_state():
                                                      CurrentData['longitude'],
                                                      CurrentData['speed'])
 
-    SetPoints['pitch'] = Settings['landingpitch']
 
-    if CurrentData['speed'] > Settings['landing_speed']:
+    if SetPoints['climb'] is not None:
         SetPoints['climb'] = 0.0
-    else:
-        SetPoints['climb'] = -0.3
+        SetPoints['speed'] = Settings['landing_speed']
 
-    if CurrentData['speed'] < 20:
+    if CurrentData['pitch'] > Settings['landingpitch']:
+        SetPoints['climb'] = None
+        SetPoints['flaps'] = 0.50
+
+
+    print("ground_alt: {}".format(CurrentData['ground_alt']))
+    if CurrentData['ground_alt'] < Settings['dropspeed_ground_alt']:
+        SetPoints['speed'] = 0.0
         return True
     return False
 
