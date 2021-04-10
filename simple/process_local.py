@@ -2,6 +2,7 @@
 
 import time
 import math
+import pprint
 from simple_pid import PID
 # from numpy import clip
 
@@ -22,6 +23,7 @@ PROGRAM = 'round'
 #PROGRAM = 'zig_zag'
 #PROGRAM = 'turns'
 #PROGRAM = 'landing'
+#PROGRAM = 'n_setalt'
 
 def error_pause(_s,_t):
     """ Print message and sleep """
@@ -58,10 +60,10 @@ def init():
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
     PIDS['throttle'] = PID(0.01, 0.003, 0.01, setpoint=0)
     PIDS['throttle'].output_limits = (0.005, 1.0)
-    PIDS['elevator_climb_middlespeed'] = PID(0.01, 0.008, 0.002, setpoint=0)
-    PIDS['elevator_climb_middlespeed'].output_limits = (-0.3, 0.1)
-    PIDS['elevator_climb_highspeed'] = PID(0.005, 0.0005, 0.002, setpoint=0)
-    PIDS['elevator_climb_highspeed'].output_limits = (-0.2, 0.1)
+    PIDS['elevator_climb_landing'] = PID(0.01, 0.008, 0.002, setpoint=0)
+    PIDS['elevator_climb_landing'].output_limits = (-0.3, 0.1)
+    PIDS['elevator_climb_flight'] = PID(0.008, 0.003, 0.008, setpoint=0)
+    PIDS['elevator_climb_flight'].output_limits = (-0.2, 0.1)
     PIDS['elevator_pitch'] = PID(0.04, 0.005, 0.0, setpoint=0)
     PIDS['elevator_pitch'].output_limits = (-0.2, 0.1)
     States['current'] = 0
@@ -92,6 +94,18 @@ def init():
         States['program'].append({ 'name': 'climbing' })
         for _n in range(20):
             States['program'].append({ 'name': 'level', 'arg': (0, 2000 + _n * 200) })
+        States['program'].append({ 'name': 'stop' })
+        ################
+    elif PROGRAM == 'n_setalt':
+        States['program'].append({ 'name': 'setspeed', 'arg': 60 })
+        States['program'].append({ 'name': 'setalt', 'arg': 150 })
+        States['program'].append({ 'name': 'takeoff' })
+        States['program'].append({ 'name': 'climbing' })
+        for _n in range(0, 20, 2):
+            States['program'].append({ 'name': 'level', 'arg': (0, 2000 + _n * 1000) })
+            States['program'].append({ 'name': 'setalt', 'arg': 300 })
+            States['program'].append({ 'name': 'level', 'arg': (0, 2000 + (_n+1) * 1000) })
+            States['program'].append({ 'name': 'setalt', 'arg': 150 })
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'zig_zag':
@@ -176,6 +190,17 @@ def bellshape(_x, flatness, limit = 1, zero = True):
         when _x is large, bellshape approaches zero """
     return _shape(_x, flatness, limit = limit, zero = zero, twist = False)
 
+def prop(_x0, _y0, _x1, _y1, _x, y_min = None, y_max = None):
+    """ calculate proportional y for x """
+    delta_x = _x1 - _x0
+    delta_y = _y1 - _y0
+    _y = _y0 + (_x - _x0) * delta_y / delta_x
+    if y_min is not None and _y < y_min:
+        _y = y_min
+    elif y_max is not None and _y > y_max:
+        _y = y_max
+    return _y
+
 def s_shape(_x, flatness, limit = 1, inverse = False):
     """ calculate s-shaped coefficient
         _x is a deviation
@@ -230,10 +255,14 @@ def process_climb(climb_dev):
     """ Altitude processing on glissade """
     climb_pid = ''
 
-    if CurrentData['speed'] < 100:
-        climb_pid = 'elevator_climb_middlespeed'
+    if get_cur_state() == 'landing':
+        climb_pid = 'elevator_climb_landing'
     else:
-        climb_pid = 'elevator_climb_highspeed'
+        k_prop = prop(60, 0.008, 100, 0.004, CurrentData['speed'], y_min = 0.001)
+        k_int = prop(60, 0.003, 100, 0.001, CurrentData['speed'], y_min = 0.0)
+        k_der = prop(60, 0.008, 100, 0.004, CurrentData['speed'], y_min = 0.0)
+        climb_pid = 'elevator_climb_flight'
+        PIDS[climb_pid].tunings = (k_prop, k_int, k_der)
 
     print("climb_pid is '{}'".format(climb_pid))
     elevator = PIDS[climb_pid](- climb_dev)
@@ -525,6 +554,8 @@ def process_data(inputs):
         for pid in PIDS:
             PIDS[pid].reset()
         set_cur_flag(True)
+        if get_cur_state() == 'initial':
+            print(pprint.pprint(States))
         print("--------------------------------------------------------------")
 
     print("State: {}".format(get_cur_state()))
@@ -609,13 +640,11 @@ if __name__ == "__main__":
     y4_var = []
     for x in range(-100,100):
         x_var.append(x)
-        y1_var.append(s_shape(x,5))
-        y2_var.append(s_shape(x,5, inverse = True))
-        y3_var.append(bellshape(x, 50, zero = False))
-        y4_var.append(bellshape(x, 50))
-    plt.plot(x_var,y1_var)
-    plt.plot(x_var,y2_var, label = 'inverse')
-    plt.plot(x_var,y3_var, label = 'bell')
-    plt.plot(x_var,y4_var, label = 'bell, zero')
+        y1_var.append(s_shape(x, 1, limit = 10))
+        y2_var.append(s_shape(x, 8, limit = 10))
+        y3_var.append(s_shape(x, 12, limit = 10))
+    plt.plot(x_var,y1_var, label = '1')
+    plt.plot(x_var,y2_var, label = '8')
+    plt.plot(x_var,y3_var, label = '12')
     plt.legend()
     plt.show()
