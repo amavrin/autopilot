@@ -18,6 +18,7 @@ PIDS = {}
 States = {}
 
 PROGRAM = 'round'
+RW_HEAD = 270
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
 #PROGRAM = 'zig_zag'
@@ -139,11 +140,11 @@ def init():
         States['program'].append({ 'name': 'setalt', 'arg': Settings['targetalt'] })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'sethead', 'arg': (90, 'left') })
+        States['program'].append({ 'name': 'sethead', 'arg': ((RW_HEAD + 180)%360, 'left') })
         States['program'].append({ 'name': 'level', 'arg': (-700, -6000) })
         # Turn to the glissade, take off speed
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
-        States['program'].append({ 'name': 'sethead', 'arg': (270, 'left') })
+        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, 'left') })
         # Lower to glissade start
         States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
         States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
@@ -152,7 +153,7 @@ def init():
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
         States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
         # Adjust heading
-        States['program'].append({ 'name': 'sethead', 'arg': (270, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
         States['program'].append({ 'name': 'descending', 'arg': (0,0) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
