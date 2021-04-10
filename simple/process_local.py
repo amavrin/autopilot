@@ -25,6 +25,8 @@ PROGRAM = 'round'
 #PROGRAM = 'landing'
 #PROGRAM = 'n_setalt'
 
+VERBOSE = False
+
 def error_pause(_s,_t):
     """ Print message and sleep """
     print("ERROR: {}".format(_s))
@@ -227,10 +229,10 @@ def process_heading(heading_dev):
     if get_cur_state() in ('takeoff', 'stop'):
         rudder = PIDS['rudder_runway'](- heading_dev)
 
-    if get_cur_state() in ('descending', 'landing'):
+    if get_cur_state() == 'landing':
         rudder = PIDS['rudder_landing'](- heading_dev)
 
-    if get_cur_state() in ('level', 'climbing', 'sethead'):
+    if get_cur_state() in ('level', 'climbing', 'descending', 'sethead'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
         k_prop_rudder = bellshape(heading_dev, 20, zero = False)
         rudder = k_prop_rudder * PIDS['rudder_flight'](-heading_dev)
@@ -264,7 +266,6 @@ def process_climb(climb_dev):
         climb_pid = 'elevator_climb_flight'
         PIDS[climb_pid].tunings = (k_prop, k_int, k_der)
 
-    print("climb_pid is '{}'".format(climb_pid))
     elevator = PIDS[climb_pid](- climb_dev)
     return elevator
 
@@ -400,7 +401,8 @@ def get_climb_for_glissade(_xa, _ya, _lat, _lon, speed, _alt):
     dist_alt_ratio = distance_to_landpoint * 3.28084 / _alt
     climb_required = (-1) * speed_fps / dist_alt_ratio
 
-    print("to land: {:+08.2f}, heading: {:+05.2f}"
+    if VERBOSE:
+        print("to land: {:+08.2f}, heading: {:+05.2f}"
           .format(distance_to_landpoint, SetPoints['heading']))
 
     return climb_required
@@ -480,7 +482,8 @@ def level_state():
 
     distance = get_distance(_x, _y, _x1, _y1)
     heading_error = get_heading_diff(CurrentData['heading'], heading_to_point)
-    print("Distance: {:5.2f}, heading_error: {:+05.2f}".format(distance, heading_error))
+    if VERBOSE:
+        print("Distance: {:5.2f}, heading_error: {:+05.2f}".format(distance, heading_error))
     if distance < Settings['level_distancedelta']:
         return True
     return False
@@ -527,7 +530,8 @@ def landing_state():
         SetPoints['flaps'] = 0.50
 
 
-    print("ground_alt: {}".format(CurrentData['ground_alt']))
+    if VERBOSE:
+        print("ground_alt: {}".format(CurrentData['ground_alt']))
     if CurrentData['ground_alt'] < Settings['dropspeed_ground_alt']:
         SetPoints['speed'] = 0.0
         return True
@@ -554,7 +558,7 @@ def process_data(inputs):
         for pid in PIDS:
             PIDS[pid].reset()
         set_cur_flag(True)
-        if get_cur_state() == 'initial':
+        if VERBOSE and get_cur_state() == 'initial':
             print(pprint.pprint(States))
         print("--------------------------------------------------------------")
 
@@ -613,7 +617,8 @@ def process_data(inputs):
     if SetPoints['speed'] is not None:
         speed_dev = CurrentData['speed'] - SetPoints['speed']
 
-    print("SetPoints: ", SetPoints)
+    if VERBOSE:
+        print("SetPoints: ", SetPoints)
 
     # Process deviations
     out = {}
@@ -625,7 +630,8 @@ def process_data(inputs):
 
     out['flaps'] = SetPoints['flaps']
 
-    print("Deviations: Heading {:+06.2f}, altitude {:+06.2f}, "
+    if VERBOSE:
+        print("Deviations: Heading {:+06.2f}, altitude {:+06.2f}, "
           "bank {:+06.2f}, speed {:+06.2f}, climb {:+06.2f}, pitch: {:+06.2f}"
           .format(heading_dev, altitude_dev, bank_dev, speed_dev, climb_dev, pitch_dev))
 
