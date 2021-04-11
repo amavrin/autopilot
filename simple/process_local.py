@@ -40,7 +40,7 @@ def init():
     # pylint: disable=too-many-branches
     """ Init data for local processing """
     Settings['takeoffspeed'] = 60.0
-    Settings['prelanding_speed'] = 60.0
+    Settings['prelanding_speed'] = 70.0
     Settings['targetspeed'] = 120.0
     Settings['landingalt'] = 40.0
     Settings['landing_speed'] = 40.0
@@ -48,16 +48,16 @@ def init():
     Settings['landingclimb'] = -0.3
     Settings['dropspeed_ground_alt'] = 4.0
     Settings['glissadealt'] = 450.0
-    Settings['glissadespeed'] = 50.0
+    Settings['glissadespeed'] = 55.0
     Settings['engine_on_rpm'] = 100
     Settings['turnbank'] = 30
     Settings['turn_headingdelta'] = 3
     Settings['level_distancedelta'] = 40
     PIDS['rudder_runway'] = PID(0.01, 0.06, 0.01, setpoint=0)
     PIDS['rudder_runway'].output_limits = (-0.3, 0.3)
-    PIDS['rudder_landing'] = PID(0.02, 0.01, 0.02, setpoint=0)
+    PIDS['rudder_landing'] = PID(0.02, 0.003, 0.0, setpoint=0)
     PIDS['rudder_landing'].output_limits = (-0.5, 0.5)
-    PIDS['rudder_flight'] = PID(0.02, 0.001, 0.0, setpoint=0)
+    PIDS['rudder_flight'] = PID(0.03, 0.005, 0.0, setpoint=0)
     PIDS['rudder_flight'].output_limits = (-0.5, 0.5)
     PIDS['aileron_level'] = PID(0.04, 0.01, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
@@ -155,7 +155,7 @@ def init():
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'sethead', 'arg': ((RW_HEAD + 180)%360, 'left') })
-        States['program'].append({ 'name': 'level', 'arg': (-700, -6000) })
+        States['program'].append({ 'name': 'level', 'arg': (-700, -5000) })
         # Turn to the glissade, take off speed
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
         States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, 'left') })
@@ -174,7 +174,8 @@ def init():
         ################
     elif PROGRAM == 'descend':
         # Descend to 22R@PHNL    InitialData['heading'] = CurrentData['heading']
-        InitialData['heading'] = 232.8
+        head_22r = 232.8
+        InitialData['heading'] = head_22r
         InitialData['altitude'] = 22.8
         InitialData['elevation'] = 19.57
         InitialData['ground_alt'] = InitialData['altitude'] - InitialData['elevation']
@@ -182,7 +183,7 @@ def init():
         InitialData['longitude'] = -157.907042
         SetPoints['altitude'] = None
         SetPoints['bank'] = 0.0
-        SetPoints['heading'] = 232.8
+        SetPoints['heading'] = head_22r
         SetPoints['speed'] = None
         SetPoints['climb'] = None
         SetPoints['flaps'] = 0.0
@@ -191,11 +192,11 @@ def init():
         States['program'].append({ 'name': 'setspeed', 'arg': 70 })
         States['program'].append({ 'name': 'setalt', 'arg': 600 })
         States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (head_22r, '') })
         States['program'].append({ 'name': 'setalt', 'arg': 450 })
         States['program'].append({ 'name': 'setspeed', 'arg': 60 })
         States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (head_22r, '') })
         States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
@@ -693,8 +694,8 @@ if __name__ == "__main__":
     _LAT = 021.34550579649
     _LON = -157.88530113263
 
-    (_x0, _y0) = get_xy_from_lat_lon(_LAT, _LON)
-    print("runway center dist: ", get_runway_center_dist(_LAT, _LON, InitialData['heading']))
-    print("heading: ", get_heading(_x0, _y0, 0, 0))
-    print("runway center heading: ", get_runway_center_heading(_LAT, _LON, 90))
-    print("x, y: ", get_xy_from_xa_ya(0,-3000))
+    for _ya in range(500, 5000, 500):
+        (_x, _y) = get_xy_from_xa_ya(0,-_ya)
+        _h = get_heading(_x, _y, 0, 0)
+        (_lat, _lon) = get_lat_lon_from_xy(_x, _y)
+        print(_ya, _x, _y, "({}, {})".format(_lat, _lon), _h)
