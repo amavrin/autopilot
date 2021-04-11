@@ -59,7 +59,7 @@ def init():
     PIDS['rudder_landing'].output_limits = (-0.5, 0.5)
     PIDS['rudder_flight'] = PID(0.03, 0.005, 0.0, setpoint=0)
     PIDS['rudder_flight'].output_limits = (-0.5, 0.5)
-    PIDS['aileron_level'] = PID(0.04, 0.01, 0.01, setpoint=0)
+    PIDS['aileron_level'] = PID(0.04, 0.005, 0.01, setpoint=0)
     PIDS['aileron_level'].output_limits = (-0.4, 0.4)
     PIDS['aileron_turn'] = PID(0.01, 0.0, 0.0, setpoint=0)
     PIDS['aileron_turn'].output_limits = (-0.4, 0.4)
@@ -76,8 +76,8 @@ def init():
 
     if PROGRAM == 'straight':
         States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
-        States['program'].append({ 'name': 'setalt', 'arg': 150 })
+        States['program'].append({ 'name': 'setspeed', 'arg': 60 })
+        States['program'].append({ 'name': 'setalt', 'arg': 100 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'level', 'arg': (0, 20000) })
@@ -118,14 +118,14 @@ def init():
         ################
     elif PROGRAM == 'zig_zag':
         States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
-        States['program'].append({ 'name': 'setalt', 'arg': 150 })
+        States['program'].append({ 'name': 'setspeed', 'arg': 55 })
+        States['program'].append({ 'name': 'setalt', 'arg': 200 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'level', 'arg': (0, 2000) })
         for _n in range(1,20,2):
-            States['program'].append({ 'name': 'level', 'arg': (100, 2000 + _n * 1000) })
-            States['program'].append({ 'name': 'level', 'arg': (-100, 2000 + (_n+1) * 1000) })
+            States['program'].append({ 'name': 'level', 'arg': (100, 2000 + _n * 7000) })
+            States['program'].append({ 'name': 'level', 'arg': (-100, 2000 + (_n+1) * 7000) })
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'runway_center':
@@ -294,6 +294,8 @@ def process_bank(bank_dev):
     if get_cur_state() == 'sethead':
         aileron = PIDS['aileron_turn'](bank_dev)
     elif get_cur_state() in ('level', 'climbing', 'descending', 'landing'):
+        k_int = prop(50, 0.005, 100, 0.01, CurrentData['speed'], y_min = 0.0)
+        PIDS['aileron_level'].tunings = (0.04, k_int, 0.01)
         aileron = PIDS['aileron_level'](bank_dev)
 
     return aileron
