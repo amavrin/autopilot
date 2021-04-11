@@ -17,16 +17,18 @@ PIDS = {}
 # level, descending, landing, stop
 States = {}
 
-PROGRAM = 'round'
-RW_HEAD = 270
+#PROGRAM = 'round'
+RW_HEAD = 233
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
 #PROGRAM = 'zig_zag'
 #PROGRAM = 'turns'
 #PROGRAM = 'landing'
 #PROGRAM = 'n_setalt'
+#PROGRAM = 'runway_center'
+PROGRAM = 'descend'
 
-VERBOSE = False
+VERBOSE = True
 
 def error_pause(_s,_t):
     """ Print message and sleep """
@@ -35,11 +37,11 @@ def error_pause(_s,_t):
 
 def init():
     # pylint: disable=too-many-statements
+    # pylint: disable=too-many-branches
     """ Init data for local processing """
     Settings['takeoffspeed'] = 60.0
     Settings['prelanding_speed'] = 60.0
     Settings['targetspeed'] = 150.0
-    Settings['targetalt'] = 700.0
     Settings['landingalt'] = 40.0
     Settings['landing_speed'] = 40.0
     Settings['landingpitch'] = 7.0
@@ -51,8 +53,8 @@ def init():
     Settings['turnbank'] = 30
     Settings['turn_headingdelta'] = 3
     Settings['level_distancedelta'] = 40
-    PIDS['rudder_runway'] = PID(0.005, 0.005, 0.001, setpoint=0)
-    PIDS['rudder_runway'].output_limits = (-1.0, 1.0)
+    PIDS['rudder_runway'] = PID(0.01, 0.06, 0.01, setpoint=0)
+    PIDS['rudder_runway'].output_limits = (-0.3, 0.3)
     PIDS['rudder_landing'] = PID(0.02, 0.01, 0.02, setpoint=0)
     PIDS['rudder_landing'].output_limits = (-0.5, 0.5)
     PIDS['rudder_flight'] = PID(0.02, 0.001, 0.0, setpoint=0)
@@ -71,9 +73,9 @@ def init():
     PIDS['elevator_pitch'].output_limits = (-0.2, 0.1)
     States['current'] = 0
     States['program'] = []
-    States['program'].append({ 'name': 'initial' })
 
     if PROGRAM == 'straight':
+        States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 120 })
         States['program'].append({ 'name': 'setalt', 'arg': 150 })
         States['program'].append({ 'name': 'takeoff' })
@@ -82,6 +84,7 @@ def init():
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'landing':
+        States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 70 })
         States['program'].append({ 'name': 'setalt', 'arg': 100 })
         States['program'].append({ 'name': 'takeoff' })
@@ -91,6 +94,7 @@ def init():
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'n_straight':
+        States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 120 })
         States['program'].append({ 'name': 'setalt', 'arg': 150 })
         States['program'].append({ 'name': 'takeoff' })
@@ -100,6 +104,7 @@ def init():
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'n_setalt':
+        States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 60 })
         States['program'].append({ 'name': 'setalt', 'arg': 150 })
         States['program'].append({ 'name': 'takeoff' })
@@ -112,6 +117,7 @@ def init():
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'zig_zag':
+        States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 120 })
         States['program'].append({ 'name': 'setalt', 'arg': 150 })
         States['program'].append({ 'name': 'takeoff' })
@@ -122,7 +128,14 @@ def init():
             States['program'].append({ 'name': 'level', 'arg': (-100, 2000 + (_n+1) * 1000) })
         States['program'].append({ 'name': 'stop' })
         ################
+    elif PROGRAM == 'runway_center':
+        States['program'].append({ 'name': 'initial' })
+        States['program'].append({ 'name': 'setspeed', 'arg': 10 })
+        States['program'].append({ 'name': 'takeoff' })
+        States['program'].append({ 'name': 'stop' })
+        ################
     elif PROGRAM == 'turns':
+        States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 100 })
         States['program'].append({ 'name': 'setalt', 'arg': 150 })
         States['program'].append({ 'name': 'takeoff' })
@@ -136,8 +149,9 @@ def init():
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'round':
+        States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['targetspeed'] })
-        States['program'].append({ 'name': 'setalt', 'arg': Settings['targetalt'] })
+        States['program'].append({ 'name': 'setalt', 'arg': 1300 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'sethead', 'arg': ((RW_HEAD + 180)%360, 'left') })
@@ -149,7 +163,7 @@ def init():
         States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
         States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
         # Make flight level and take off speed to glissage's one
-        States['program'].append({ 'name': 'sethead', 'arg': (270, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
         States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
         # Adjust heading
@@ -158,6 +172,34 @@ def init():
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
+    elif PROGRAM == 'descend':
+        # Descend to 22R@PHNL    InitialData['heading'] = CurrentData['heading']
+        InitialData['heading'] = 233
+        InitialData['altitude'] = 22.8
+        InitialData['elevation'] = 19.57
+        InitialData['ground_alt'] = InitialData['altitude'] - InitialData['elevation']
+        InitialData['latitude'] = 21.329585284472998
+        InitialData['longitude'] = -157.90754655900193
+        SetPoints['altitude'] = 1300
+        SetPoints['bank'] = 0.0
+        SetPoints['heading'] = 233
+        SetPoints['speed'] = 90
+        SetPoints['climb'] = None
+        SetPoints['flaps'] = 0.0
+        SetPoints['pitch'] = None
+
+        States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
+        States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
+        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
+        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
+        States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
+        States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
+        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
+        States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
+        States['program'].append({ 'name': 'landing' })
+        States['program'].append({ 'name': 'stop' })
+
+
     else:
         error_pause("Choose correct program", 1000)
 
@@ -230,10 +272,10 @@ def process_heading(heading_dev):
     if get_cur_state() in ('takeoff', 'stop'):
         rudder = PIDS['rudder_runway'](- heading_dev)
 
-    if get_cur_state() == 'landing':
+    if get_cur_state() in ('landing', '123'):
         rudder = PIDS['rudder_landing'](- heading_dev)
 
-    if get_cur_state() in ('level', 'climbing', 'descending', 'sethead'):
+    if get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
         k_prop_rudder = bellshape(heading_dev, 20, zero = False)
         rudder = k_prop_rudder * PIDS['rudder_flight'](-heading_dev)
@@ -282,7 +324,6 @@ def get_xy_from_lat_lon(_lat, _lon):
     _y = 6371000 * r_lat_local
     return (_x, _y)
 
-# Unused, not tested
 def get_lat_lon_from_xy(_x, _y):
     """ Calculate lat and lon from X and Y """
     r_lat_local = _y / 6371000
@@ -358,27 +399,33 @@ def get_heading_diff2(_h1, _h2, _dir):
         hdiff += 360
     return hdiff
 
-def get_runway_center_dist(_lat, _lon, _a0):
-    """ Calculate distance from runway center to the plane """
+def get_runway_center_dist(_lat, _lon, runway_heading):
+    """ Calculate distance from runway center to the plane.
+        If plane is deviated counter-clock-wise, dist is positive.
+        If plane is deviated clock-wise, dist is negative. """
     # Current plane point
     (_x, _y) = get_xy_from_lat_lon(_lat, _lon)
 
     r_angle_to_plane = math.atan2(_y, _x)
     angle_to_plane = math.degrees(r_angle_to_plane)
-    _a1 = angle_to_heading(angle_to_plane)
+    heading_to_plane = angle_to_heading(angle_to_plane)
     # angle from runway center to direction to plane
-    _a_delta = get_heading_diff(_a0, _a1)
+    _a_delta = get_heading_diff(heading_to_plane, runway_heading)
 
     distance_from_start = get_distance(0, 0, _x, _y)
     center_dev = distance_from_start * math.tan(math.radians(_a_delta))
+    if VERBOSE:
+        print("center dev: {}".format(center_dev))
     return center_dev
 
 def get_runway_center_correction(speed, center_dist):
-    """ Get correction angle on runway """
+    """ Get correction angle on runway.
+        If we need to go clock-wise, correction is negative.
+        If we need to go counter-clock-wise, correction is positive. """
     # Knots to m/s
     speed_meter_ps = speed * 0.514444
-    # get the angle to center on railway in 30 sec
-    center_correction = math.degrees(math.atan(center_dist/(speed_meter_ps*30 + 1)))
+    # get the angle to center on railway in 20 sec
+    center_correction = math.degrees(math.atan(center_dist/(speed_meter_ps*20 + 1)))
     return center_correction
 
 def get_runway_center_heading(_lat, _lon, _speed):
@@ -639,19 +686,18 @@ def process_data(inputs):
     return out
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    x_var = []
-    y1_var = []
-    y2_var = []
-    y3_var = []
-    y4_var = []
-    for x in range(-100,100):
-        x_var.append(x)
-        y1_var.append(s_shape(x, 1, limit = 10))
-        y2_var.append(s_shape(x, 8, limit = 10))
-        y3_var.append(s_shape(x, 12, limit = 10))
-    plt.plot(x_var,y1_var, label = '1')
-    plt.plot(x_var,y2_var, label = '8')
-    plt.plot(x_var,y3_var, label = '12')
-    plt.legend()
-    plt.show()
+    initial = (60.043182672722665, 30.515070954451193)
+    InitialData['latitude'] = initial[0]
+    InitialData['longitude'] = initial[1]
+    InitialData['heading'] = 355
+    # E
+    east1 = (initial[0], 30.533355739334926)
+    # S
+    south1 = (60.03413796036875, initial[1])
+    # W
+    west1 = (initial[0], 30.49695758988552)
+    # N
+    north1 = (60.05218464994107, initial[1])
+
+    print(get_xy_from_lat_lon(59.98025245064746, 30.644680210821523))
+    print(get_lat_lon_from_xy(7196.537105221833, -6997.521427377919))
