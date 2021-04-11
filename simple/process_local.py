@@ -17,8 +17,8 @@ PIDS = {}
 # level, descending, landing, stop
 States = {}
 
-#PROGRAM = 'round'
-RW_HEAD = 233
+PROGRAM = 'round'
+RW_HEAD = 52
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
 #PROGRAM = 'zig_zag'
@@ -26,7 +26,7 @@ RW_HEAD = 233
 #PROGRAM = 'landing'
 #PROGRAM = 'n_setalt'
 #PROGRAM = 'runway_center'
-PROGRAM = 'descend'
+#PROGRAM = 'descend'
 
 VERBOSE = True
 
@@ -41,7 +41,7 @@ def init():
     """ Init data for local processing """
     Settings['takeoffspeed'] = 60.0
     Settings['prelanding_speed'] = 60.0
-    Settings['targetspeed'] = 150.0
+    Settings['targetspeed'] = 120.0
     Settings['landingalt'] = 40.0
     Settings['landing_speed'] = 40.0
     Settings['landingpitch'] = 7.0
@@ -150,8 +150,8 @@ def init():
         ################
     elif PROGRAM == 'round':
         States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['targetspeed'] })
-        States['program'].append({ 'name': 'setalt', 'arg': 1300 })
+        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
+        States['program'].append({ 'name': 'setalt', 'arg': 800 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'sethead', 'arg': ((RW_HEAD + 180)%360, 'left') })
@@ -174,25 +174,26 @@ def init():
         ################
     elif PROGRAM == 'descend':
         # Descend to 22R@PHNL    InitialData['heading'] = CurrentData['heading']
-        InitialData['heading'] = 233
+        InitialData['heading'] = 232.8
         InitialData['altitude'] = 22.8
         InitialData['elevation'] = 19.57
         InitialData['ground_alt'] = InitialData['altitude'] - InitialData['elevation']
         InitialData['latitude'] = 21.329819
         InitialData['longitude'] = -157.907042
-        SetPoints['altitude'] = 1300
+        SetPoints['altitude'] = None
         SetPoints['bank'] = 0.0
-        SetPoints['heading'] = 233
-        SetPoints['speed'] = 90
+        SetPoints['heading'] = 232.8
+        SetPoints['speed'] = None
         SetPoints['climb'] = None
         SetPoints['flaps'] = 0.0
         SetPoints['pitch'] = None
 
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
-        States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
+        States['program'].append({ 'name': 'setspeed', 'arg': 70 })
+        States['program'].append({ 'name': 'setalt', 'arg': 600 })
         States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
         States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
+        States['program'].append({ 'name': 'setalt', 'arg': 450 })
+        States['program'].append({ 'name': 'setspeed', 'arg': 60 })
         States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
         States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
         States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
@@ -272,10 +273,10 @@ def process_heading(heading_dev):
     if get_cur_state() in ('takeoff', 'stop'):
         rudder = PIDS['rudder_runway'](- heading_dev)
 
-    if get_cur_state() in ('landing', '123'):
+    if get_cur_state() in ('landing', 'descending'):
         rudder = PIDS['rudder_landing'](- heading_dev)
 
-    if get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
+    if get_cur_state() in ('level', 'climbing', 'sethead'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
         k_prop_rudder = bellshape(heading_dev, 20, zero = False)
         rudder = k_prop_rudder * PIDS['rudder_flight'](-heading_dev)
@@ -686,14 +687,14 @@ def process_data(inputs):
     return out
 
 if __name__ == "__main__":
-    InitialData['heading'] = 233
+    InitialData['heading'] = 232.8
     InitialData['latitude'] = 21.329819
     InitialData['longitude'] = -157.907042
-    _LAT = 021.33500105478
-    _LON = -157.89779413351
+    _LAT = 021.34550579649
+    _LON = -157.88530113263
 
     (_x0, _y0) = get_xy_from_lat_lon(_LAT, _LON)
-    print(get_runway_center_dist(_LAT, _LON, InitialData['heading']))
-    print(get_heading(_x0, _y0, 0, 0))
-    print(get_runway_center_heading(_LAT, _LON, 90))
-    print(get_xy_from_xa_ya(0,-3000))
+    print("runway center dist: ", get_runway_center_dist(_LAT, _LON, InitialData['heading']))
+    print("heading: ", get_heading(_x0, _y0, 0, 0))
+    print("runway center heading: ", get_runway_center_heading(_LAT, _LON, 90))
+    print("x, y: ", get_xy_from_xa_ya(0,-3000))

@@ -14,8 +14,8 @@
 --offset-distance=3 \
 --on-ground=false \
 --enable-freeze \
---vc=90 \
---altitude=1300 \
+--vc=75 \
+--altitude=1200 \
 --prop:/engines/engine[0]/rpm=1000 \
 --generic=socket,out,4,localhost,10000,udp,output \
 --generic=socket,in,4,localhost,10001,udp,input

@@ -7,7 +7,7 @@
 --disable-terrasync \
 --aircraft=org.flightgear.fgaddon.stable_2018.g109 \
 --airport=PHNL \
---runway=22R \
+--runway=04L \
 --httpd=8080 \
 --telnet=1024 \
 --generic=socket,out,4,localhost,10000,udp,output \
