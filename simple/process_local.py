@@ -605,8 +605,8 @@ def process_data(inputs):
     CurrentData['ground_alt'] = CurrentData['altitude'] - CurrentData['elevation']
 
     if not get_cur_flag():
-        for pid in PIDS:
-            PIDS[pid].reset()
+        #for pid in PIDS:
+        #    PIDS[pid].reset()
         set_cur_flag(True)
         if VERBOSE and get_cur_state() == 'initial':
             print(pprint.pprint(States))
