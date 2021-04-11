@@ -178,8 +178,8 @@ def init():
         InitialData['altitude'] = 22.8
         InitialData['elevation'] = 19.57
         InitialData['ground_alt'] = InitialData['altitude'] - InitialData['elevation']
-        InitialData['latitude'] = 21.329585284472998
-        InitialData['longitude'] = -157.90754655900193
+        InitialData['latitude'] = 21.329819
+        InitialData['longitude'] = -157.907042
         SetPoints['altitude'] = 1300
         SetPoints['bank'] = 0.0
         SetPoints['heading'] = 233
@@ -413,7 +413,7 @@ def get_runway_center_dist(_lat, _lon, runway_heading):
     _a_delta = get_heading_diff(heading_to_plane, runway_heading)
 
     distance_from_start = get_distance(0, 0, _x, _y)
-    center_dev = distance_from_start * math.tan(math.radians(_a_delta))
+    center_dev = distance_from_start * math.sin(math.radians(_a_delta))
     if VERBOSE:
         print("center dev: {}".format(center_dev))
     return center_dev
@@ -686,18 +686,14 @@ def process_data(inputs):
     return out
 
 if __name__ == "__main__":
-    initial = (60.043182672722665, 30.515070954451193)
-    InitialData['latitude'] = initial[0]
-    InitialData['longitude'] = initial[1]
-    InitialData['heading'] = 355
-    # E
-    east1 = (initial[0], 30.533355739334926)
-    # S
-    south1 = (60.03413796036875, initial[1])
-    # W
-    west1 = (initial[0], 30.49695758988552)
-    # N
-    north1 = (60.05218464994107, initial[1])
+    InitialData['heading'] = 233
+    InitialData['latitude'] = 21.329819
+    InitialData['longitude'] = -157.907042
+    _LAT = 021.33500105478
+    _LON = -157.89779413351
 
-    print(get_xy_from_lat_lon(59.98025245064746, 30.644680210821523))
-    print(get_lat_lon_from_xy(7196.537105221833, -6997.521427377919))
+    (_x0, _y0) = get_xy_from_lat_lon(_LAT, _LON)
+    print(get_runway_center_dist(_LAT, _LON, InitialData['heading']))
+    print(get_heading(_x0, _y0, 0, 0))
+    print(get_runway_center_heading(_LAT, _LON, 90))
+    print(get_xy_from_xa_ya(0,-3000))
