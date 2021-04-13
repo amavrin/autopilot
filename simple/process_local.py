@@ -32,12 +32,14 @@ Deviations['heading'] = 0.0
 # level, descending, landing, stop
 States = {}
 
-RW_HEAD = 270
+HEAD_22R = 232.8
+HEAD_04R = 52.8
+RW_HEAD = HEAD_04R
 
-PROGRAM = 'round'
+#PROGRAM = 'round'
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
-#PROGRAM = 'zig_zag'
+PROGRAM = 'zig_zag'
 #PROGRAM = 'turns'
 #PROGRAM = 'landing'
 #PROGRAM = 'n_setalt'
@@ -58,8 +60,8 @@ def init():
     Settings['takeoffspeed'] = 60.0
     Settings['prelanding_speed'] = 70.0
     Settings['targetspeed'] = 120.0
-    Settings['landingalt'] = 35.0
-    Settings['landing_speed'] = 35.0
+    Settings['landingalt'] = 50.0
+    Settings['landing_speed'] = 40.0
     Settings['landingpitch'] = 7.0
     Settings['landingclimb'] = -0.1
     Settings['dropspeed_ground_alt'] = 4.0
@@ -87,11 +89,11 @@ def init():
         ################
     elif PROGRAM == 'landing':
         States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 70 })
+        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
         States['program'].append({ 'name': 'setalt', 'arg': 100 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'descending', 'arg': (0,2000) })
+        States['program'].append({ 'name': 'descending', 'arg': (0,1500) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
@@ -121,13 +123,14 @@ def init():
     elif PROGRAM == 'zig_zag':
         States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 55 })
-        States['program'].append({ 'name': 'setalt', 'arg': 200 })
+        States['program'].append({ 'name': 'setalt', 'arg': 100 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'level', 'arg': (0, 2000) })
         for _n in range(1,20,2):
-            States['program'].append({ 'name': 'level', 'arg': (100, 2000 + _n * 7000) })
-            States['program'].append({ 'name': 'level', 'arg': (-100, 2000 + (_n+1) * 7000) })
+            States['program'].append({ 'name': 'level', 'arg': (100, 2000 + _n * 1000) })
+            States['program'].append({ 'name': 'level', 'arg': (-100, 2000 + (_n+1) * 1000) })
+            States['program'].append({ 'name': 'setspeed', 'arg': 60 + _n * 5 })
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'runway_center':
@@ -176,8 +179,7 @@ def init():
         ################
     elif PROGRAM == 'descend':
         # Descend to 22R@PHNL    InitialData['heading'] = CurrentData['heading']
-        head_22r = 232.8
-        InitialData['heading'] = head_22r
+        InitialData['heading'] = HEAD_22R
         InitialData['altitude'] = 22.8
         InitialData['elevation'] = 19.57
         InitialData['ground_alt'] = InitialData['altitude'] - InitialData['elevation']
@@ -185,7 +187,7 @@ def init():
         InitialData['longitude'] = -157.907042
         SetPoints['altitude'] = None
         SetPoints['bank'] = 0.0
-        SetPoints['heading'] = head_22r
+        SetPoints['heading'] = HEAD_22R
         SetPoints['speed'] = None
         SetPoints['climb'] = None
         SetPoints['flaps'] = 0.0
@@ -194,11 +196,11 @@ def init():
         States['program'].append({ 'name': 'setspeed', 'arg': 70 })
         States['program'].append({ 'name': 'setalt', 'arg': 600 })
         States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (head_22r, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (HEAD_22R, '') })
         States['program'].append({ 'name': 'setalt', 'arg': 450 })
         States['program'].append({ 'name': 'setspeed', 'arg': 60 })
         States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (head_22r, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (HEAD_22R, '') })
         States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
@@ -286,9 +288,11 @@ def process_heading(heading_dev):
         (low, high) = (-0.5, 0.5)
     elif get_cur_state() in ('level', 'climbing', 'sethead'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
-        k_prop = bellshape(heading_dev, 20, limit = 0.03, zero = False)
+        k_flatness = prop(0, 0, 20, 20, CurrentData['ground_alt'],
+                    y_min = 0, y_max = 20)
+        k_prop = bellshape(heading_dev, k_flatness, limit = 0.03, zero = False)
         k_int = 0.005
-        k_der = 0.0
+        k_der = 0.001
 
         # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
         bank_prop = s_shape(heading_dev, 8)
@@ -309,12 +313,12 @@ def process_bank(bank_dev):
     high = 0.0
 
     if get_cur_state() == 'sethead':
-        (k_prop, k_int, k_der) = (0.01, 0.0, 0.0)
+        (k_prop, k_int, k_der) = (0.01, 0.01, 0.0)
         (low, high) = (-0.4, 0.4)
     elif get_cur_state() in ('level', 'climbing', 'descending', 'landing'):
         k_prop = 0.04
-        k_int = prop(50, 0.005, 100, 0.01, CurrentData['speed'], y_min = 0.0)
-        k_der = 0.01
+        k_int = prop(50, 0.003, 100, 0.012, CurrentData['speed'], y_min = 0.0)
+        k_der = prop(100, 0.01, 50, 0.05, CurrentData['speed'])
         (low, high) = (-0.4, 0.4)
 
     PIDS['aileron'].tunings = (k_prop, k_int, k_der)
@@ -332,7 +336,9 @@ def process_climb(climb_dev):
     high = 0.0
 
     if get_cur_state() == 'landing':
-        (k_prop, k_int, k_der) = (0.01, 0.015, 0.002)
+        k_prop = 0.01
+        k_int = prop(70, 0.005, 40, 0.015, CurrentData['speed'], y_min = 0.0)
+        k_der = 0.002
         (low, high) = (-0.3, 0.1)
     else:
         k_prop = prop(60, 0.008, 100, 0.004, CurrentData['speed'], y_min = 0.001)
@@ -494,7 +500,8 @@ def get_climb_for_glissade(_xa, _ya, _lat, _lon, speed, _alt):
 def get_climb_by_altitude():
     """ Set climb based on altitude """
     altitude_dev = SetPoints['altitude'] - CurrentData['altitude']
-    climb = s_shape(altitude_dev, 10, limit = 10)
+    climb_limit = prop(0, 0, 100, 10, CurrentData['speed'])
+    climb = s_shape(altitude_dev, 10, limit = climb_limit)
     return climb
 
 def initial_state():
