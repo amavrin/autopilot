@@ -34,12 +34,12 @@ States = {}
 
 RW_HEAD = 270
 
-#PROGRAM = 'round'
+PROGRAM = 'round'
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
 #PROGRAM = 'zig_zag'
 #PROGRAM = 'turns'
-PROGRAM = 'landing'
+#PROGRAM = 'landing'
 #PROGRAM = 'n_setalt'
 #PROGRAM = 'runway_center'
 #PROGRAM = 'descend'
@@ -58,10 +58,10 @@ def init():
     Settings['takeoffspeed'] = 60.0
     Settings['prelanding_speed'] = 70.0
     Settings['targetspeed'] = 120.0
-    Settings['landingalt'] = 40.0
-    Settings['landing_speed'] = 40.0
+    Settings['landingalt'] = 35.0
+    Settings['landing_speed'] = 35.0
     Settings['landingpitch'] = 7.0
-    Settings['landingclimb'] = -0.3
+    Settings['landingclimb'] = -0.1
     Settings['dropspeed_ground_alt'] = 4.0
     Settings['glissadealt'] = 450.0
     Settings['glissadespeed'] = 55.0
@@ -91,7 +91,7 @@ def init():
         States['program'].append({ 'name': 'setalt', 'arg': 100 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'descending', 'arg': (0,2500) })
+        States['program'].append({ 'name': 'descending', 'arg': (0,2000) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
@@ -332,7 +332,7 @@ def process_climb(climb_dev):
     high = 0.0
 
     if get_cur_state() == 'landing':
-        (k_prop, k_int, k_der) = (0.01, 0.008, 0.002)
+        (k_prop, k_int, k_der) = (0.01, 0.015, 0.002)
         (low, high) = (-0.3, 0.1)
     else:
         k_prop = prop(60, 0.008, 100, 0.004, CurrentData['speed'], y_min = 0.001)
@@ -640,37 +640,52 @@ def descending_state():
     return False
 
 def landing_state():
-    """ Process landing state 2
-        Make flight horisontal at landingalt and drop speed """
+    """ Process landing state in 2 phases:
+        1. Make flight horisontal at landingalt, drop speed and wait for pith
+        2. Lower slowly with constant pitch """
 
     SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
                                                      CurrentData['longitude'],
                                                      CurrentData['speed'])
 
 
-    if SetPoints['climb'] is not None:
+
+    if 'landing_phase' not in CurrentData:
+        CurrentData['landing_phase'] = 1
+
+    if CurrentData['landing_phase'] == 1:
         SetPoints['climb'] = 0.0
         SetPoints['speed'] = Settings['landing_speed']
+        SetPoints['flaps'] = 1.0
+        elev_dev_kind = 'climb'
+        throt_dev_kind = 'speed'
+        if CurrentData['pitch'] > Settings['landingpitch']:
+            CurrentData['landing_phase'] = 2
 
-    if CurrentData['pitch'] > Settings['landingpitch']:
-        SetPoints['climb'] = None
-        SetPoints['flaps'] = 0.50
+    if CurrentData['landing_phase'] == 2:
+        SetPoints['climb'] = Settings['landingclimb']
+        SetPoints['speed'] = 0.0
+        SetPoints['pitch'] = Settings['landingpitch']
+        elev_dev_kind = 'pitch'
+        throt_dev_kind = 'climb'
 
+    calc_devs()
+    print("elev_dev_kind: ", elev_dev_kind)
+    Out['elevator'] = process_climb(Deviations[elev_dev_kind])
+    print("throt_dev_kind: ", throt_dev_kind)
+    Out['throttle'] = process_speed(Deviations[throt_dev_kind])
 
     if VERBOSE:
         print("ground_alt: {}".format(CurrentData['ground_alt']))
 
-    calc_devs()
 
     # Process deviations
     Out['aileron'] = process_bank(Deviations['bank'])
     Out['rudder'] = process_heading(Deviations['heading'])
-    Out['elevator'] = process_climb(Deviations['climb'])
-    Out['throttle'] = process_speed(Deviations['speed'])
     Out['flaps'] = SetPoints['flaps']
 
     if CurrentData['ground_alt'] < Settings['dropspeed_ground_alt']:
-        SetPoints['speed'] = 0.0
+        Out['throttle'] = 0.0
         return True
     return False
 
