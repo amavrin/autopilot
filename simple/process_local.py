@@ -36,10 +36,10 @@ HEAD_22R = 232.8
 HEAD_04R = 52.8
 RW_HEAD = HEAD_04R
 
-#PROGRAM = 'round'
+PROGRAM = 'round'
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
-PROGRAM = 'zig_zag'
+#PROGRAM = 'zig_zag'
 #PROGRAM = 'turns'
 #PROGRAM = 'landing'
 #PROGRAM = 'n_setalt'
@@ -160,20 +160,20 @@ def init():
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
         States['program'].append({ 'name': 'sethead', 'arg': ((RW_HEAD + 180)%360, 'left') })
-        States['program'].append({ 'name': 'level', 'arg': (-700, -5000) })
+        States['program'].append({ 'name': 'level', 'arg': (-1100, -5000) })
         # Turn to the glissade, take off speed
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
         States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, 'left') })
         # Lower to glissade start
         States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
-        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
+        States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
         # Make flight level and take off speed to glissage's one
         States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
-        States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
+        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
         # Adjust heading
         States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
-        States['program'].append({ 'name': 'descending', 'arg': (0,0) })
+        States['program'].append({ 'name': 'descending', 'arg': (0,-250) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
@@ -312,14 +312,10 @@ def process_bank(bank_dev):
     low = 0.0
     high = 0.0
 
-    if get_cur_state() == 'sethead':
-        (k_prop, k_int, k_der) = (0.01, 0.01, 0.0)
-        (low, high) = (-0.4, 0.4)
-    elif get_cur_state() in ('level', 'climbing', 'descending', 'landing'):
-        k_prop = 0.04
-        k_int = prop(50, 0.003, 100, 0.012, CurrentData['speed'], y_min = 0.0)
-        k_der = prop(100, 0.01, 50, 0.05, CurrentData['speed'])
-        (low, high) = (-0.4, 0.4)
+    k_prop = 0.04
+    k_int = prop(50, 0.003, 100, 0.012, CurrentData['speed'], y_min = 0.0)
+    k_der = prop(100, 0.01, 50, 0.05, CurrentData['speed'])
+    (low, high) = (-0.4, 0.4)
 
     PIDS['aileron'].tunings = (k_prop, k_int, k_der)
     PIDS['aileron'].output_limits = (low, high)
