@@ -34,7 +34,8 @@ Deviations['heading'] = 0.0
 # level, descending, landing, stop
 States = {}
 
-PROGRAM = 'round'
+#PROGRAM = 'round'
+PROGRAM = 'to_runway'
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
 #PROGRAM = 'zig_zag'
@@ -212,6 +213,30 @@ def init():
         # Adjust heading
         States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
         States['program'].append({ 'name': 'descending', 'arg': (0,-250) })
+        States['program'].append({ 'name': 'landing' })
+        States['program'].append({ 'name': 'stop' })
+        ################
+    elif PROGRAM == 'to_runway':
+        land_rw_head = get_rw_head(Settings['landing_runway'])
+        States['program'].append({ 'name': 'initial' })
+        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
+        States['program'].append({ 'name': 'setalt', 'arg': 800 })
+        States['program'].append({ 'name': 'takeoff' })
+        States['program'].append({ 'name': 'climbing' })
+        States['program'].append({ 'name': 'set_runway', 'arg': (Settings['landing_runway']) })
+        States['program'].append({ 'name': 'level', 'arg': (0, -5000) })
+        # Turn to the glissade, take off speed
+        States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
+        # Lower to glissade start
+        States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
+        States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
+        # Make flight level and take off speed to glissage's one
+        States['program'].append({ 'name': 'sethead', 'arg': (land_rw_head, '') })
+        States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
+        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
+        # Adjust heading
+        States['program'].append({ 'name': 'sethead', 'arg': (land_rw_head, '') })
+        States['program'].append({ 'name': 'descending', 'arg': (0,-350) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
@@ -547,6 +572,9 @@ def initial_state():
     SetPoints['flaps'] = 0.0
     SetPoints['pitch'] = None
 
+    takeoff_rw = Settings['takeoff_runway']
+    Runway[takeoff_rw][0] = CurrentData['latitude']
+    Runway[takeoff_rw][1] = CurrentData['longitude']
 
     if CurrentData['rpm'] > Settings['engine_on_rpm']:
         return True
@@ -562,9 +590,11 @@ def setspeed_state():
     SetPoints['speed'] = get_cur_arg()
     return True
 
-def set_runway_state(runway):
+def set_runway_state():
     """ set base runway """
+    runway = get_cur_arg()
     Runway['base'] = Runway[runway]
+    return True
 
 def takeoff_state():
     """ Process takeoff state """
@@ -793,6 +823,8 @@ def process_data(inputs):
         go_next = setalt_state()
     elif get_cur_state() == 'setspeed':
         go_next = setspeed_state()
+    elif get_cur_state() == 'set_runway':
+        go_next = set_runway_state()
     elif get_cur_state() == 'takeoff':
         go_next = takeoff_state()
     elif get_cur_state() == 'climbing':
