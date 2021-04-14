@@ -8,7 +8,7 @@
 --geometry=800x600 \
 --aircraft=org.flightgear.fgaddon.stable_2018.g109 \
 --airport=PHNL \
---runway=04L \
+--runway=08L \
 --httpd=8080 \
 --telnet=1024 \
 --generic=socket,out,4,localhost,10000,udp,output \

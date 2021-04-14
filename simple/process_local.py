@@ -3,14 +3,16 @@
 import time
 import math
 import pprint
+import configparser
+import re
 from simple_pid import PID
 # from numpy import clip
 
 Settings = {}
 SetPoints = {}
-InitialData = {}
 CurrentData = {}
 PIDS = {}
+Runway = {}
 
 Out = {}
 Out['aileron'] = 0.0
@@ -32,10 +34,6 @@ Deviations['heading'] = 0.0
 # level, descending, landing, stop
 States = {}
 
-HEAD_22R = 232.8
-HEAD_04R = 52.8
-RW_HEAD = HEAD_04R
-
 PROGRAM = 'round'
 #PROGRAM = 'straight'
 #PROGRAM = 'n_straight'
@@ -53,24 +51,63 @@ def error_pause(_s,_t):
     print("ERROR: {}".format(_s))
     time.sleep(_t)
 
+def get_rw_start_lat_lon(runway = 'base'):
+    """ get starting lat, lon for the runway """
+    (_lat, _lon) = (float(Runway[runway][0]), float(Runway[runway][1]))
+    return (_lat, _lon)
+
+def get_rw_end_lat_lon(runway = 'base'):
+    """ get ending lat, lon for the runway """
+    (_lat, _lon) = (float(Runway[runway][2]), float(Runway[runway][3]))
+    return (_lat, _lon)
+
+def get_rw_elev(runway = 'base'):
+    """ get starting elevation for the runway """
+    elev = (float(Runway[runway][4]))
+    return elev
+
+def get_rw_head(runway = 'base'):
+    """ get the heading for the runway """
+    (_lat0, _lon0) = get_rw_start_lat_lon(runway)
+    (_lat1, _lon1) = get_rw_end_lat_lon(runway)
+    (_x0, _y0) = get_xy_from_lat_lon(_lat0, _lon0)
+    (_x1, _y1) = get_xy_from_lat_lon(_lat1, _lon1)
+    head = get_heading(_x0, _y0, _x1, _y1)
+    return head
+
+def parse_config():
+    """ read config file """
+    config = configparser.ConfigParser()
+    config.read('process_local.conf')
+    Settings['takeoffspeed'] = config.getfloat('settings', 'takeoffspeed')
+    Settings['prelanding_speed'] = config.getfloat('settings', 'prelanding_speed')
+    Settings['targetspeed'] = config.getfloat('settings', 'targetspeed')
+    Settings['landingalt'] = config.getfloat('settings', 'landingalt')
+    Settings['landing_speed'] = config.getfloat('settings', 'landing_speed')
+    Settings['landingpitch'] = config.getfloat('settings', 'landingpitch')
+    Settings['landingclimb'] = config.getfloat('settings', 'landingclimb')
+    Settings['dropspeed_ground_alt'] = config.getfloat('settings', 'dropspeed_ground_alt')
+    Settings['glissadealt'] = config.getfloat('settings', 'glissadealt')
+    Settings['glissadespeed'] = config.getfloat('settings', 'glissadespeed')
+    Settings['engine_on_rpm'] = config.getint('settings', 'engine_on_rpm')
+    Settings['turnbank'] = config.getfloat('settings', 'turnbank')
+    Settings['turn_headingdelta'] = config.getfloat('settings', 'turnbank')
+    Settings['level_distancedelta'] = config.getfloat('settings', 'level_distancedelta')
+    Settings['takeoff_runway'] = config['settings']['takeoff_runway']
+    Settings['landing_runway'] = config['settings']['landing_runway']
+
+    for runway in config['runways']:
+        Runway[runway] = re.split(', *|,', config['runways'][runway])
+
+    Runway['base'] = Runway[Settings['takeoff_runway']]
+
 def init():
     # pylint: disable=too-many-statements
     # pylint: disable=too-many-branches
     """ Init data for local processing """
-    Settings['takeoffspeed'] = 60.0
-    Settings['prelanding_speed'] = 70.0
-    Settings['targetspeed'] = 120.0
-    Settings['landingalt'] = 50.0
-    Settings['landing_speed'] = 40.0
-    Settings['landingpitch'] = 7.0
-    Settings['landingclimb'] = -0.1
-    Settings['dropspeed_ground_alt'] = 4.0
-    Settings['glissadealt'] = 450.0
-    Settings['glissadespeed'] = 55.0
-    Settings['engine_on_rpm'] = 100
-    Settings['turnbank'] = 30
-    Settings['turn_headingdelta'] = 3
-    Settings['level_distancedelta'] = 40
+
+    parse_config()
+
     PIDS['rudder'] = PID(0.0, 0.0, 0.0, setpoint=0)
     PIDS['aileron'] = PID(0.0, 0.0, 0.0, setpoint=0)
     PIDS['throttle'] = PID(0.0, 0.0, 0.0, setpoint=0)
@@ -154,53 +191,49 @@ def init():
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'round':
+        rw_head = get_rw_head()
         States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 120 })
         States['program'].append({ 'name': 'setalt', 'arg': 800 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'sethead', 'arg': ((RW_HEAD + 180)%360, 'left') })
+        States['program'].append({ 'name': 'sethead', 'arg': ((rw_head + 180)%360, 'left') })
         States['program'].append({ 'name': 'level', 'arg': (-1100, -5000) })
         # Turn to the glissade, take off speed
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
-        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, 'left') })
+        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, 'left') })
         # Lower to glissade start
         States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
         States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
         # Make flight level and take off speed to glissage's one
-        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
         States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
         # Adjust heading
-        States['program'].append({ 'name': 'sethead', 'arg': (RW_HEAD, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
         States['program'].append({ 'name': 'descending', 'arg': (0,-250) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'descend':
-        # Descend to 22R@PHNL    InitialData['heading'] = CurrentData['heading']
-        InitialData['heading'] = HEAD_22R
-        InitialData['altitude'] = 22.8
-        InitialData['elevation'] = 19.57
-        InitialData['ground_alt'] = InitialData['altitude'] - InitialData['elevation']
-        InitialData['latitude'] = 21.329819
-        InitialData['longitude'] = -157.907042
+        rw_head = get_rw_head('landing_runway')
         SetPoints['altitude'] = None
         SetPoints['bank'] = 0.0
-        SetPoints['heading'] = HEAD_22R
+        SetPoints['heading'] = get_rw_head('landing_runway')
         SetPoints['speed'] = None
         SetPoints['climb'] = None
         SetPoints['flaps'] = 0.0
         SetPoints['pitch'] = None
 
+        States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
         States['program'].append({ 'name': 'setspeed', 'arg': 70 })
         States['program'].append({ 'name': 'setalt', 'arg': 600 })
         States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (HEAD_22R, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
         States['program'].append({ 'name': 'setalt', 'arg': 450 })
         States['program'].append({ 'name': 'setspeed', 'arg': 60 })
         States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (HEAD_22R, '') })
+        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
         States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
@@ -356,18 +389,20 @@ def process_speed(speed_dev):
 
 def get_xy_from_lat_lon(_lat, _lon):
     """ Calculate relative X and Y based on latitude and longitude """
-    r_lat_local = math.radians(_lat - InitialData['latitude'])
-    r_lon_local = math.radians(_lon - InitialData['longitude'])
-    _x = 6371000 * r_lon_local * math.cos(math.radians(InitialData['latitude']))
+    (base_lat, base_lon) = get_rw_start_lat_lon('base')
+    r_lat_local = math.radians(_lat - base_lat)
+    r_lon_local = math.radians(_lon - base_lon)
+    _x = 6371000 * r_lon_local * math.cos(math.radians(base_lat))
     _y = 6371000 * r_lat_local
     return (_x, _y)
 
 def get_lat_lon_from_xy(_x, _y):
     """ Calculate lat and lon from X and Y """
+    (base_lat, base_lon) = get_rw_start_lat_lon('base')
     r_lat_local = _y / 6371000
-    r_lon_local = _x / 6371000 / math.cos(r_lat_local + math.radians(InitialData['latitude']))
-    lat = math.degrees(r_lat_local) + InitialData['latitude']
-    lon = math.degrees(r_lon_local) + InitialData['longitude']
+    r_lon_local = _x / 6371000 / math.cos(r_lat_local + math.radians(base_lat))
+    lat = math.degrees(r_lat_local) + base_lat
+    lon = math.degrees(r_lon_local) + base_lon
     return (lat, lon)
 
 def heading_to_angle(_h):
@@ -384,7 +419,8 @@ def get_xy_from_xa_ya(_xa, _ya):
     """ get Earth X and Y from xa, ya measured from start point
         in the runway coordiante system """
     # angle to runway in Earth coordinate system in degrees
-    runway_angle = heading_to_angle(InitialData['heading'])
+    base_head = get_rw_head('base')
+    runway_angle = heading_to_angle(base_head)
     # angle to runway in Earth coordinate system in radians
     r_runway_angle = math.radians(runway_angle)
     # distance from starting point
@@ -468,9 +504,10 @@ def get_runway_center_correction(speed, center_dist):
 
 def get_runway_center_heading(_lat, _lon, _speed):
     """ Get heading to runway center """
-    center_dist = get_runway_center_dist(_lat, _lon, InitialData['heading'])
+    base_head = get_rw_head('base')
+    center_dist = get_runway_center_dist(_lat, _lon, base_head)
     center_correction = get_runway_center_correction(_speed, center_dist)
-    center_heading = InitialData['heading'] + center_correction
+    center_heading = base_head + center_correction
     return center_heading
 
 def get_climb_for_glissade(_xa, _ya, _lat, _lon, speed, _alt):
@@ -502,13 +539,6 @@ def get_climb_by_altitude():
 
 def initial_state():
     """ Process initial state """
-    InitialData['heading'] = CurrentData['heading']
-    InitialData['altitude'] = CurrentData['altitude']
-    InitialData['elevation'] = CurrentData['elevation']
-    InitialData['ground_alt'] = CurrentData['ground_alt']
-    InitialData['latitude'] = CurrentData['latitude']
-    InitialData['longitude'] = CurrentData['longitude']
-
     SetPoints['altitude'] = None
     SetPoints['bank'] = None
     SetPoints['heading'] = None
@@ -531,6 +561,10 @@ def setspeed_state():
     """ Process set speed state """
     SetPoints['speed'] = get_cur_arg()
     return True
+
+def set_runway_state(runway):
+    """ set base runway """
+    Runway['base'] = Runway[runway]
 
 def takeoff_state():
     """ Process takeoff state """
@@ -785,9 +819,7 @@ def process_data(inputs):
     return Out
 
 if __name__ == "__main__":
-    InitialData['heading'] = 232.8
-    InitialData['latitude'] = 21.329819
-    InitialData['longitude'] = -157.907042
+    parse_config()
     _LAT = 021.34550579649
     _LON = -157.88530113263
 
