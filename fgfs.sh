@@ -5,6 +5,7 @@
 --prop:/environment/weather-scenario=Core high pressure region \
 --disable-rembrandt \
 --disable-terrasync \
+--geometry=800x600 \
 --aircraft=org.flightgear.fgaddon.stable_2018.g109 \
 --airport=PHNL \
 --runway=04L \
@@ -12,3 +13,4 @@
 --telnet=1024 \
 --generic=socket,out,4,localhost,10000,udp,output \
 --generic=socket,in,4,localhost,10001,udp,input
+
