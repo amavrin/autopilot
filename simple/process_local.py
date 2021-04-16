@@ -13,6 +13,7 @@ SetPoints = {}
 CurrentData = {}
 PIDS = {}
 Runway = {}
+Flight = {}
 
 Out = {}
 Out['aileron'] = 0.0
@@ -33,17 +34,6 @@ Deviations['heading'] = 0.0
 # setspeed
 # level, descending, landing, stop
 States = {}
-
-#PROGRAM = 'round'
-PROGRAM = 'to_runway'
-#PROGRAM = 'straight'
-#PROGRAM = 'n_straight'
-#PROGRAM = 'zig_zag'
-#PROGRAM = 'turns'
-#PROGRAM = 'landing'
-#PROGRAM = 'n_setalt'
-#PROGRAM = 'runway_center'
-#PROGRAM = 'descend'
 
 VERBOSE = True
 
@@ -83,6 +73,7 @@ def parse_config():
     Settings['takeoffspeed'] = config.getfloat('settings', 'takeoffspeed')
     Settings['prelanding_speed'] = config.getfloat('settings', 'prelanding_speed')
     Settings['targetspeed'] = config.getfloat('settings', 'targetspeed')
+    Settings['targetalt'] = config.getfloat('settings', 'targetalt')
     Settings['landingalt'] = config.getfloat('settings', 'landingalt')
     Settings['landing_speed'] = config.getfloat('settings', 'landing_speed')
     Settings['landingpitch'] = config.getfloat('settings', 'landingpitch')
@@ -97,10 +88,65 @@ def parse_config():
     Settings['takeoff_runway'] = config['settings']['takeoff_runway']
     Settings['landing_runway'] = config['settings']['landing_runway']
 
+    Flight['steps'] = re.split(', *|,', config['flight']['program'])
+
     for runway in config['runways']:
         Runway[runway] = re.split(', *|,', config['runways'][runway])
 
     Runway['base'] = Runway[Settings['takeoff_runway']]
+
+def construct_program():
+    """ Construct flight program """
+
+    States['program'] = []
+    States['program'].append({ 'name': 'initial' })
+    States['program'].append({ 'name': 'setspeed', 'arg': Settings['targetspeed'] })
+    States['program'].append({ 'name': 'setalt', 'arg': Settings['targetalt'] })
+    States['program'].append({ 'name': 'takeoff' })
+    States['program'].append({ 'name': 'climbing' })
+
+    for step in Flight['steps']:
+        if step == 'n_setalt':
+            for _n in range(0, 20, 2):
+                States['program'].append({ 'name': 'level', 'arg': (0, 3000 + _n * 1000) })
+                States['program'].append({ 'name': 'setalt', 'arg': 300 })
+                States['program'].append({ 'name': 'level', 'arg': (0, 3000 + (_n+1) * 1000) })
+                States['program'].append({ 'name': 'setalt', 'arg': 150 })
+        elif step == 'zig_zag':
+            for _n in range(1,20,2):
+                States['program'].append({ 'name': 'level', 'arg': (100, 3000 + _n * 1000) })
+                States['program'].append({ 'name': 'level', 'arg': (-100, 3000 + (_n+1) * 1000) })
+                States['program'].append({ 'name': 'setspeed', 'arg': 60 + _n * 5 })
+        elif step == 'turns':
+            States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
+            States['program'].append({ 'name': 'sethead', 'arg': (340, 'right') })
+            States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
+            States['program'].append({ 'name': 'sethead', 'arg': (340, 'right') })
+            States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
+            States['program'].append({ 'name': 'sethead', 'arg': (340, 'right') })
+        elif step == 'round':
+            rw_head = get_rw_head()
+            States['program'].append({ 'name': 'sethead', 'arg': ((rw_head + 180)%360, 'left') })
+            States['program'].append({ 'name': 'level', 'arg': (-1100, -5000) })
+        elif step == 'to_runway':
+            States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
+        else:
+            error_pause("Choose correct program", 1000)
+
+    # Finish
+    States['program'].append({ 'name': 'level', 'arg': (0, -5000) })
+    # Turn to the glissade, take off speed
+    States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
+    States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
+    States['program'].append({ 'name': 'setalt', 'arg': 600 })
+    States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
+    States['program'].append({ 'name': 'level', 'arg': (0, -2500) })
+    # start glissade
+    States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
+    States['program'].append({ 'name': 'landing' })
+    States['program'].append({ 'name': 'stop' })
+    ################
+
 
 def init():
     # pylint: disable=too-many-statements
@@ -108,167 +154,13 @@ def init():
     """ Init data for local processing """
 
     parse_config()
+    construct_program()
 
     PIDS['rudder'] = PID(0.0, 0.0, 0.0, setpoint=0)
     PIDS['aileron'] = PID(0.0, 0.0, 0.0, setpoint=0)
     PIDS['throttle'] = PID(0.0, 0.0, 0.0, setpoint=0)
     PIDS['elevator'] = PID(0.0, 0.0, 0.0, setpoint=0)
     States['current'] = 0
-    States['program'] = []
-
-    if PROGRAM == 'straight':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 60 })
-        States['program'].append({ 'name': 'setalt', 'arg': 100 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'level', 'arg': (0, 20000) })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'landing':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
-        States['program'].append({ 'name': 'setalt', 'arg': 400 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'set_runway', 'arg': (Settings['landing_runway']) })
-        States['program'].append({ 'name': 'level', 'arg': (-1200, -5000) })
-        States['program'].append({ 'name': 'level', 'arg': (0, -3500) })
-        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
-        States['program'].append({ 'name': 'descending', 'arg': (0,0) })
-        States['program'].append({ 'name': 'landing' })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'n_straight':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
-        States['program'].append({ 'name': 'setalt', 'arg': 150 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        for _n in range(20):
-            States['program'].append({ 'name': 'level', 'arg': (0, 2000 + _n * 200) })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'n_setalt':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 60 })
-        States['program'].append({ 'name': 'setalt', 'arg': 150 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        for _n in range(0, 20, 2):
-            States['program'].append({ 'name': 'level', 'arg': (0, 2000 + _n * 1000) })
-            States['program'].append({ 'name': 'setalt', 'arg': 300 })
-            States['program'].append({ 'name': 'level', 'arg': (0, 2000 + (_n+1) * 1000) })
-            States['program'].append({ 'name': 'setalt', 'arg': 150 })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'zig_zag':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 55 })
-        States['program'].append({ 'name': 'setalt', 'arg': 100 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'level', 'arg': (0, 2000) })
-        for _n in range(1,20,2):
-            States['program'].append({ 'name': 'level', 'arg': (100, 2000 + _n * 1000) })
-            States['program'].append({ 'name': 'level', 'arg': (-100, 2000 + (_n+1) * 1000) })
-            States['program'].append({ 'name': 'setspeed', 'arg': 60 + _n * 5 })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'runway_center':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 10 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'turns':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 100 })
-        States['program'].append({ 'name': 'setalt', 'arg': 150 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
-        States['program'].append({ 'name': 'sethead', 'arg': (340, 'right') })
-        States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
-        States['program'].append({ 'name': 'sethead', 'arg': (340, 'right') })
-        States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
-        States['program'].append({ 'name': 'sethead', 'arg': (340, 'right') })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'round':
-        rw_head = get_rw_head()
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
-        States['program'].append({ 'name': 'setalt', 'arg': 800 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'sethead', 'arg': ((rw_head + 180)%360, 'left') })
-        States['program'].append({ 'name': 'level', 'arg': (-1100, -5000) })
-        # Turn to the glissade, take off speed
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
-        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, 'left') })
-        # Lower to glissade start
-        States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
-        States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
-        # Make flight level and take off speed to glissage's one
-        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
-        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
-        # Adjust heading
-        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
-        States['program'].append({ 'name': 'descending', 'arg': (0,-250) })
-        States['program'].append({ 'name': 'landing' })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'to_runway':
-        States['program'].append({ 'name': 'initial' })
-        States['program'].append({ 'name': 'setspeed', 'arg': 120 })
-        States['program'].append({ 'name': 'setalt', 'arg': 800 })
-        States['program'].append({ 'name': 'takeoff' })
-        States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'set_runway', 'arg': (Settings['landing_runway']) })
-        States['program'].append({ 'name': 'level', 'arg': (0, -5000) })
-        # Turn to the glissade, take off speed
-        States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
-        States['program'].append({ 'name': 'setalt', 'arg': 600 })
-        States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
-        States['program'].append({ 'name': 'level', 'arg': (0, -2500) })
-        # start glissade
-        States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
-        States['program'].append({ 'name': 'landing' })
-        States['program'].append({ 'name': 'stop' })
-        ################
-    elif PROGRAM == 'descend':
-        rw_head = get_rw_head(Settings['landing_runway'])
-        SetPoints['altitude'] = None
-        SetPoints['heading'] = rw_head
-        SetPoints['speed'] = None
-        SetPoints['climb'] = None
-        SetPoints['flaps'] = 0.0
-        SetPoints['pitch'] = None
-
-        # --vc=75
-        # --altitude=600
-        # --offset-distance=1.5 (2500m)
-        States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
-        States['program'].append({ 'name': 'setalt', 'arg': 600 })
-        #States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
-        #States['program'].append({ 'name': 'level', 'arg': (0, -2500) })
-
-        #disrupt
-        States['program'].append({ 'name': 'setalt', 'arg': 600 })
-        States['program'].append({ 'name': 'level', 'arg': (20, -2500) })
-
-        # start glissade
-        States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
-        States['program'].append({ 'name': 'landing' })
-        States['program'].append({ 'name': 'stop' })
-
-
-    else:
-        error_pause("Choose correct program", 1000)
 
 def get_cur_state():
     """ Return current state """
