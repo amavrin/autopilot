@@ -10,12 +10,12 @@
 --httpd=8080 \
 --telnet=1024 \
 --airport=PHNL \
---runway=22R \
---offset-distance=3 \
+--runway=26R \
+--offset-distance=1.5 \
 --on-ground=false \
 --enable-freeze \
---vc=75 \
---altitude=1200 \
---prop:/engines/engine[0]/rpm=1000 \
+--vc=60 \
+--altitude=600 \
+--prop:/engines/engine[0]/rpm=300 \
 --generic=socket,out,4,localhost,10000,udp,output \
 --generic=socket,in,4,localhost,10001,udp,input

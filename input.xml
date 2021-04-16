@@ -30,6 +30,11 @@
         <type>double</type>
         <node>/controls/flight/flaps</node>
       </chunk>
+      <chunk>
+        <name>brakes</name>
+        <type>bool</type>
+        <node>/controls/gear/brake-parking</node>
+      </chunk>
     </input>
   </generic>
 </PropertyList>

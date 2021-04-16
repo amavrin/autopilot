@@ -20,6 +20,7 @@ Out['elevator'] = 0.0
 Out['rudder'] = 0.0
 Out['throttle'] = 0.0
 Out['flaps'] = 0.0
+Out['brake'] = True
 
 Deviations = {}
 Deviations['altitude'] = 0.0
@@ -128,10 +129,14 @@ def init():
     elif PROGRAM == 'landing':
         States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 120 })
-        States['program'].append({ 'name': 'setalt', 'arg': 100 })
+        States['program'].append({ 'name': 'setalt', 'arg': 400 })
         States['program'].append({ 'name': 'takeoff' })
         States['program'].append({ 'name': 'climbing' })
-        States['program'].append({ 'name': 'descending', 'arg': (0,1500) })
+        States['program'].append({ 'name': 'set_runway', 'arg': (Settings['landing_runway']) })
+        States['program'].append({ 'name': 'level', 'arg': (-1200, -5000) })
+        States['program'].append({ 'name': 'level', 'arg': (0, -3500) })
+        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
+        States['program'].append({ 'name': 'descending', 'arg': (0,0) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
@@ -217,7 +222,6 @@ def init():
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'to_runway':
-        land_rw_head = get_rw_head(Settings['landing_runway'])
         States['program'].append({ 'name': 'initial' })
         States['program'].append({ 'name': 'setspeed', 'arg': 120 })
         States['program'].append({ 'name': 'setalt', 'arg': 800 })
@@ -226,39 +230,40 @@ def init():
         States['program'].append({ 'name': 'set_runway', 'arg': (Settings['landing_runway']) })
         States['program'].append({ 'name': 'level', 'arg': (0, -5000) })
         # Turn to the glissade, take off speed
+        States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
         States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
-        # Lower to glissade start
-        States['program'].append({ 'name': 'setalt', 'arg': Settings['glissadealt'] })
+        States['program'].append({ 'name': 'setalt', 'arg': 600 })
         States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
-        # Make flight level and take off speed to glissage's one
-        States['program'].append({ 'name': 'sethead', 'arg': (land_rw_head, '') })
-        States['program'].append({ 'name': 'setspeed', 'arg': Settings['glissadespeed'] })
-        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
-        # Adjust heading
-        States['program'].append({ 'name': 'sethead', 'arg': (land_rw_head, '') })
-        States['program'].append({ 'name': 'descending', 'arg': (0,-350) })
+        States['program'].append({ 'name': 'level', 'arg': (0, -2500) })
+        # start glissade
+        States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
         ################
     elif PROGRAM == 'descend':
-        rw_head = get_rw_head('landing_runway')
+        rw_head = get_rw_head(Settings['landing_runway'])
         SetPoints['altitude'] = None
         SetPoints['bank'] = 0.0
-        SetPoints['heading'] = get_rw_head('landing_runway')
+        SetPoints['heading'] = rw_head
         SetPoints['speed'] = None
         SetPoints['climb'] = None
         SetPoints['flaps'] = 0.0
         SetPoints['pitch'] = None
 
+        # --vc=75
+        # --altitude=600
+        # --offset-distance=1.5 (2500m)
         States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
-        States['program'].append({ 'name': 'setspeed', 'arg': 70 })
+        States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
         States['program'].append({ 'name': 'setalt', 'arg': 600 })
-        States['program'].append({ 'name': 'level', 'arg': (0, -3000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
-        States['program'].append({ 'name': 'setalt', 'arg': 450 })
-        States['program'].append({ 'name': 'setspeed', 'arg': 60 })
-        States['program'].append({ 'name': 'level', 'arg': (0, -2000) })
-        States['program'].append({ 'name': 'sethead', 'arg': (rw_head, '') })
+        #States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
+        #States['program'].append({ 'name': 'level', 'arg': (0, -2500) })
+
+        #disrupt
+        States['program'].append({ 'name': 'setalt', 'arg': 600 })
+        States['program'].append({ 'name': 'level', 'arg': (20, -2500) })
+
+        # start glissade
         States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
         States['program'].append({ 'name': 'landing' })
         States['program'].append({ 'name': 'stop' })
@@ -328,7 +333,7 @@ def _shape(_x, flatness = 1, limit = 1, zero = True, inverse = False, twist = Tr
         out = (-1) * out
     return out
 
-def process_heading(heading_dev):
+def get_rudder(heading_dev):
     """ Heading processing. Also set required bank angle """
     k_prop = 0.0
     k_int = 0.0
@@ -342,7 +347,7 @@ def process_heading(heading_dev):
         (k_prop, k_int, k_der) = (0.01, 0.02, 0.02)
         (low, high) = (-0.3, 0.3)
     elif get_cur_state() in ('landing', 'descending'):
-        (k_prop, k_int, k_der) = (0.02, 0.003, 0.0)
+        (k_prop, k_int, k_der) = (0.00, 0.008, 0.008)
         (low, high) = (-0.5, 0.5)
     elif get_cur_state() in ('level', 'climbing', 'sethead'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
@@ -362,7 +367,7 @@ def process_heading(heading_dev):
     rudder = PIDS['rudder']((-1)*heading_dev)
     return rudder
 
-def process_bank(bank_dev):
+def get_aileron(bank_dev):
     """ Sample bank processing """
     k_prop = 0.0
     k_int = 0.0
@@ -381,7 +386,7 @@ def process_bank(bank_dev):
     aileron = PIDS['aileron'](bank_dev)
     return aileron
 
-def process_climb(climb_dev):
+def get_elevator(climb_dev):
     """ Altitude processing on glissade """
     k_prop = 0.0
     k_int = 0.0
@@ -391,7 +396,7 @@ def process_climb(climb_dev):
 
     if get_cur_state() == 'landing':
         k_prop = 0.01
-        k_int = prop(70, 0.005, 40, 0.015, CurrentData['speed'], y_min = 0.0)
+        k_int = prop(70, 0.01, 40, 0.015, CurrentData['speed'], y_min = 0.0)
         k_der = 0.002
         (low, high) = (-0.3, 0.1)
     else:
@@ -406,7 +411,7 @@ def process_climb(climb_dev):
     elevator = PIDS['elevator'](- climb_dev)
     return elevator
 
-def process_speed(speed_dev):
+def get_throttle(speed_dev):
     """ Flight speed processing """
     PIDS['throttle'].tunings = (0.01, 0.003, 0.01)
     PIDS['throttle'].output_limits = (0.002, 1.0)
@@ -604,8 +609,9 @@ def takeoff_state():
     calc_devs()
 
     # Process deviations
-    Out['rudder'] = process_heading(Deviations['heading'])
+    Out['rudder'] = get_rudder(Deviations['heading'])
     Out['throttle'] = 1.0
+    Out['brake'] = False
 
     if CurrentData['speed'] > Settings['takeoffspeed']:
         return True
@@ -618,10 +624,10 @@ def climbing_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = process_bank(Deviations['bank'])
-    Out['rudder'] = process_heading(Deviations['heading'])
-    Out['elevator'] = process_climb(Deviations['climb'])
-    Out['throttle'] = process_speed(Deviations['speed'])
+    Out['aileron'] = get_aileron(Deviations['bank'])
+    Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['elevator'] = get_elevator(Deviations['climb'])
+    Out['throttle'] = get_throttle(Deviations['speed'])
 
     if CurrentData['altitude'] > SetPoints['altitude']:
         return True
@@ -636,10 +642,10 @@ def sethead_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = process_bank(Deviations['bank'])
-    Out['rudder'] = process_heading(Deviations['heading'])
-    Out['elevator'] = process_climb(Deviations['climb'])
-    Out['throttle'] = process_speed(Deviations['speed'])
+    Out['aileron'] = get_aileron(Deviations['bank'])
+    Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['elevator'] = get_elevator(Deviations['climb'])
+    Out['throttle'] = get_throttle(Deviations['speed'])
 
     if abs(heading_diff) < Settings['turn_headingdelta']:
         return True
@@ -663,10 +669,10 @@ def level_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = process_bank(Deviations['bank'])
-    Out['rudder'] = process_heading(Deviations['heading'])
-    Out['elevator'] = process_climb(Deviations['climb'])
-    Out['throttle'] = process_speed(Deviations['speed'])
+    Out['aileron'] = get_aileron(Deviations['bank'])
+    Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['elevator'] = get_elevator(Deviations['climb'])
+    Out['throttle'] = get_throttle(Deviations['speed'])
 
     if distance < Settings['level_distancedelta']:
         return True
@@ -696,10 +702,10 @@ def descending_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = process_bank(Deviations['bank'])
-    Out['rudder'] = process_heading(Deviations['heading'])
-    Out['elevator'] = process_climb(Deviations['climb'])
-    Out['throttle'] = process_speed(Deviations['speed'])
+    Out['aileron'] = get_aileron(Deviations['bank'])
+    Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['elevator'] = get_elevator(Deviations['climb'])
+    Out['throttle'] = get_throttle(Deviations['speed'])
     Out['flaps'] = SetPoints['flaps']
 
     if CurrentData['ground_alt'] < Settings['landingalt']:
@@ -711,6 +717,8 @@ def landing_state():
         1. Make flight horisontal at landingalt, drop speed and wait for pith
         2. Lower slowly with constant pitch """
 
+    Out['brake'] = True
+
     SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
                                                      CurrentData['longitude'],
                                                      CurrentData['speed'])
@@ -721,7 +729,7 @@ def landing_state():
         CurrentData['landing_phase'] = 1
 
     if CurrentData['landing_phase'] == 1:
-        SetPoints['climb'] = 0.0
+        SetPoints['climb'] = -0.5
         SetPoints['speed'] = Settings['landing_speed']
         SetPoints['flaps'] = 1.0
         elev_dev_kind = 'climb'
@@ -738,23 +746,35 @@ def landing_state():
 
     calc_devs()
     print("elev_dev_kind: ", elev_dev_kind)
-    Out['elevator'] = process_climb(Deviations[elev_dev_kind])
+    Out['elevator'] = get_elevator(Deviations[elev_dev_kind])
     print("throt_dev_kind: ", throt_dev_kind)
-    Out['throttle'] = process_speed(Deviations[throt_dev_kind])
+    Out['throttle'] = get_throttle(Deviations[throt_dev_kind])
 
     if VERBOSE:
         print("ground_alt: {}".format(CurrentData['ground_alt']))
 
-
     # Process deviations
-    Out['aileron'] = process_bank(Deviations['bank'])
-    Out['rudder'] = process_heading(Deviations['heading'])
+    Out['aileron'] = get_aileron(Deviations['bank'])
+    Out['rudder'] = get_rudder(Deviations['heading'])
     Out['flaps'] = SetPoints['flaps']
 
     if CurrentData['ground_alt'] < Settings['dropspeed_ground_alt']:
         Out['throttle'] = 0.0
         return True
     return False
+
+def stop_state():
+    """ On the runway """
+    SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
+                                                     CurrentData['longitude'],
+                                                     CurrentData['speed'])
+    Out['aileron'] = 0.0
+    Out['elevator'] = 0.0
+    Out['rudder'] = 0.0
+    Out['throttle'] = 0.0
+    Out['flaps'] = 0.0
+    Out['brake'] = True
+
 
 def calc_devs():
     """ Calculate deviations """
@@ -838,7 +858,7 @@ def process_data(inputs):
     elif get_cur_state() == 'landing':
         go_next = landing_state()
     elif get_cur_state() == 'stop':
-        print("Brakes!")
+        stop_state()
     else:
         error_pause("Unknown state", 100)
 
