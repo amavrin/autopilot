@@ -351,11 +351,11 @@ def get_rudder(heading_dev):
         (low, high) = (-0.5, 0.5)
     elif get_cur_state() in ('level', 'climbing', 'sethead'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
-        k_flatness = prop(0, 0, 20, 20, CurrentData['ground_alt'],
-                    y_min = 0, y_max = 20)
-        k_prop = bellshape(heading_dev, k_flatness, limit = 0.03, zero = False)
-        k_int = 0.005
-        k_der = 0.001
+        k_prop = bellshape(heading_dev, 10, limit = 0.03, zero = False)
+        #k_int = bellshape(heading_dev, 10, limit = 0.001, zero = False)
+        k_int = 0
+        k_der = 0.0
+        (low, high) = (-0.3, 0.3)
 
         # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
         bank_prop = s_shape(heading_dev, 8)
@@ -745,13 +745,12 @@ def landing_state():
         throt_dev_kind = 'climb'
 
     calc_devs()
-    print("elev_dev_kind: ", elev_dev_kind)
     Out['elevator'] = get_elevator(Deviations[elev_dev_kind])
-    print("throt_dev_kind: ", throt_dev_kind)
     Out['throttle'] = get_throttle(Deviations[throt_dev_kind])
 
     if VERBOSE:
-        print("ground_alt: {}".format(CurrentData['ground_alt']))
+        print("elev kind: {}, thot kind: {}, ground_alt: {}"
+                .format(elev_dev_kind, throt_dev_kind, CurrentData['ground_alt']))
 
     # Process deviations
     Out['aileron'] = get_aileron(Deviations['bank'])
@@ -807,7 +806,7 @@ def calc_devs():
         Deviations['speed'] = CurrentData['speed'] - SetPoints['speed']
 
     if VERBOSE:
-        print("Deviations: ", Deviations)
+        print("Deviations: ", ["{}: {:+.3f}".format(x, Deviations[x]) for x in Deviations])
 
 def process_data(inputs):
     # pylint: disable=too-many-statements
