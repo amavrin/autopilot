@@ -26,7 +26,6 @@ Deviations = {}
 Deviations['altitude'] = 0.0
 Deviations['climb'] = 0.0
 Deviations['pitch'] = 0.0
-Deviations['bank'] = 0.0
 Deviations['speed'] = 0.0
 Deviations['heading'] = 0.0
 
@@ -243,7 +242,6 @@ def init():
     elif PROGRAM == 'descend':
         rw_head = get_rw_head(Settings['landing_runway'])
         SetPoints['altitude'] = None
-        SetPoints['bank'] = 0.0
         SetPoints['heading'] = rw_head
         SetPoints['speed'] = None
         SetPoints['climb'] = None
@@ -341,15 +339,10 @@ def get_rudder(heading_dev):
     low = 0.0
     high = 0.0
 
-    SetPoints['bank'] = 0.0
-
-    if get_cur_state() in ('takeoff', 'stop'):
-        (k_prop, k_int, k_der) = (0.01, 0.02, 0.02)
+    if get_cur_state() in ('takeoff', 'stop', 'landing'):
+        (k_prop, k_int, k_der) = (0.005, 0.02, 0.02)
         (low, high) = (-0.3, 0.3)
-    elif get_cur_state() in ('landing', 'descending'):
-        (k_prop, k_int, k_der) = (0.00, 0.008, 0.008)
-        (low, high) = (-0.5, 0.5)
-    elif get_cur_state() in ('level', 'climbing', 'sethead'):
+    elif get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
         k_prop = bellshape(heading_dev, 10, limit = 0.03, zero = False)
         #k_int = bellshape(heading_dev, 10, limit = 0.001, zero = False)
@@ -357,18 +350,23 @@ def get_rudder(heading_dev):
         k_der = 0.0
         (low, high) = (-0.3, 0.3)
 
-        # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
-        bank_prop = s_shape(heading_dev, 8)
-        SetPoints['bank'] = bank_prop*Settings['turnbank']
-
     PIDS['rudder'].tunings = (k_prop, k_int, k_der)
     PIDS['rudder'].output_limits = (low, high)
 
     rudder = PIDS['rudder']((-1)*heading_dev)
     return rudder
 
-def get_aileron(bank_dev):
+def get_aileron(heading_dev):
     """ Sample bank processing """
+
+    SetPoints['bank'] = 0.0
+    if get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
+        # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
+        bank_prop = s_shape(heading_dev, 8)
+        SetPoints['bank'] = bank_prop*Settings['turnbank']
+
+    Deviations['bank'] = CurrentData['bank'] - SetPoints['bank']
+
     k_prop = 0.0
     k_int = 0.0
     k_der = 0.0
@@ -383,7 +381,7 @@ def get_aileron(bank_dev):
     PIDS['aileron'].tunings = (k_prop, k_int, k_der)
     PIDS['aileron'].output_limits = (low, high)
 
-    aileron = PIDS['aileron'](bank_dev)
+    aileron = PIDS['aileron'](Deviations['bank'])
     return aileron
 
 def get_elevator(climb_dev):
@@ -570,7 +568,6 @@ def get_climb_by_altitude():
 def initial_state():
     """ Process initial state """
     SetPoints['altitude'] = None
-    SetPoints['bank'] = None
     SetPoints['heading'] = None
     SetPoints['speed'] = None
     SetPoints['climb'] = None
@@ -624,8 +621,8 @@ def climbing_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = get_aileron(Deviations['bank'])
     Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['aileron'] = get_aileron(Deviations['heading'])
     Out['elevator'] = get_elevator(Deviations['climb'])
     Out['throttle'] = get_throttle(Deviations['speed'])
 
@@ -642,8 +639,8 @@ def sethead_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = get_aileron(Deviations['bank'])
     Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['aileron'] = get_aileron(Deviations['heading'])
     Out['elevator'] = get_elevator(Deviations['climb'])
     Out['throttle'] = get_throttle(Deviations['speed'])
 
@@ -669,8 +666,8 @@ def level_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = get_aileron(Deviations['bank'])
     Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['aileron'] = get_aileron(Deviations['heading'])
     Out['elevator'] = get_elevator(Deviations['climb'])
     Out['throttle'] = get_throttle(Deviations['speed'])
 
@@ -702,8 +699,8 @@ def descending_state():
     calc_devs()
 
     # Process deviations
-    Out['aileron'] = get_aileron(Deviations['bank'])
     Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['aileron'] = get_aileron(Deviations['heading'])
     Out['elevator'] = get_elevator(Deviations['climb'])
     Out['throttle'] = get_throttle(Deviations['speed'])
     Out['flaps'] = SetPoints['flaps']
@@ -753,8 +750,8 @@ def landing_state():
                 .format(elev_dev_kind, throt_dev_kind, CurrentData['ground_alt']))
 
     # Process deviations
-    Out['aileron'] = get_aileron(Deviations['bank'])
     Out['rudder'] = get_rudder(Deviations['heading'])
+    Out['aileron'] = get_aileron(Deviations['heading'])
     Out['flaps'] = SetPoints['flaps']
 
     if CurrentData['ground_alt'] < Settings['dropspeed_ground_alt']:
@@ -781,7 +778,6 @@ def calc_devs():
     Deviations['altitude'] = 0.0
     Deviations['climb'] = 0.0
     Deviations['pitch'] = 0.0
-    Deviations['bank'] = 0.0
     Deviations['speed'] = 0.0
     Deviations['heading'] = 0.0
 
@@ -800,8 +796,6 @@ def calc_devs():
         Deviations['climb'] = CurrentData['climb'] - SetPoints['climb']
     if SetPoints['pitch'] is not None:
         Deviations['pitch'] = CurrentData['pitch'] - SetPoints['pitch']
-    if SetPoints['bank'] is not None:
-        Deviations['bank'] = CurrentData['bank'] - SetPoints['bank']
     if SetPoints['speed'] is not None:
         Deviations['speed'] = CurrentData['speed'] - SetPoints['speed']
 
