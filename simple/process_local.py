@@ -113,10 +113,10 @@ def construct_program():
                 States['program'].append({ 'name': 'level', 'arg': (0, 3000 + (_n+1) * 1000) })
                 States['program'].append({ 'name': 'setalt', 'arg': 150 })
         elif step == 'zig_zag':
-            for _n in range(1,20,2):
-                States['program'].append({ 'name': 'level', 'arg': (100, 3000 + _n * 1000) })
-                States['program'].append({ 'name': 'level', 'arg': (-100, 3000 + (_n+1) * 1000) })
-                States['program'].append({ 'name': 'setspeed', 'arg': 60 + _n * 5 })
+            for _n in range(1,6,2):
+                States['program'].append({ 'name': 'level', 'arg': (100, 4000 + _n * 1500) })
+                States['program'].append({ 'name': 'level', 'arg': (-100, 4000 + (_n+1) * 1500) })
+                States['program'].append({ 'name': 'setspeed', 'arg': 80 + _n * 5 })
         elif step == 'turns':
             States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
             States['program'].append({ 'name': 'sethead', 'arg': (340, 'right') })
