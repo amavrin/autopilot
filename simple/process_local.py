@@ -138,7 +138,8 @@ def construct_program():
             error_pause("Choose correct program", 1000)
 
     # Finish
-    States['program'].append({ 'name': 'level_head', 'arg': (0, -5000) })
+    # FIXME: make direction decision automatically
+    States['program'].append({ 'name': 'level_head', 'arg': (0, -5000, 'right') })
     # Turn to the glissade, take off speed
     States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
     States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
@@ -545,65 +546,75 @@ def sethead_state():
     return False
 
 def level_head_state():
+    # pylint: disable=too-many-locals
     """ Go to the point and set head """
-    A0 = heading_to_angle(CurrentData['heading'])
-    (X1a, Y1a) = get_cur_arg()
-    (X1, Y1) = get_xy_from_xa_ya(X1a, Y1a)
-    A1head = get_rw_head()
-    A1 = heading_to_angle(A1head)
-    X0, Y0 = get_xy_from_lat_lon(CurrentData['latitude'],
+    current_heading = heading_to_angle(CurrentData['heading'])
+    (_x1a, _y1a, circle) = get_cur_arg()
+    (_x1, _y1) = get_xy_from_xa_ya(_x1a, _y1a)
+    target_head = get_rw_head()
+    target_angle = heading_to_angle(target_head)
+    _x0, _y0 = get_xy_from_lat_lon(CurrentData['latitude'],
                                  CurrentData['longitude'])
 
     # Turn radius
-    R = 800
+    circle_radius = 800
     # Preliminary distance
-    L = 1000
+    pre_distance = 1000
 
     # Calculate left and right circles from where we are
-    rA0left = math.radians(A0) + math.pi/2
-    rA0right = math.radians(A0) - math.pi/2
-    Xr0left = X0 + math.cos(rA0left)*R
-    Yr0left = Y0 + math.sin(rA0left)*R
-    Xr0right = X0 + math.cos(rA0right)*R
-    Yr0right = Y0 + math.sin(rA0right)*R
+    c0_left_center_angle = math.radians(current_heading) + math.pi/2
+    c0_right_center_angle = math.radians(current_heading) - math.pi/2
+    c0_left_center_x = _x0 + math.cos(c0_left_center_angle)*circle_radius
+    c0_left_center_y = _y0 + math.sin(c0_left_center_angle)*circle_radius
+    c0_right_center_x = _x0 + math.cos(c0_right_center_angle)*circle_radius
+    c0_right_center_y = _y0 + math.sin(c0_right_center_angle)*circle_radius
 
     # Calculate preliminary dest point
-    X1pre = X1 - math.cos(math.radians(A1))*L
-    Y1pre = Y1 - math.sin(math.radians(A1))*L
+    _x1pre = _x1 - math.cos(math.radians(target_angle))*pre_distance
+    _y1pre = _y1 - math.sin(math.radians(target_angle))*pre_distance
 
     # Left and righr circles ar preliminary dest point
-    rA1left = math.radians(A1) + math.pi/2
-    rA1right = math.radians(A1) - math.pi/2
-    Xr1left = X1pre + math.cos(rA1left)*R
-    Yr1left = Y1pre + math.sin(rA1left)*R
-    Xr1right = X1pre + math.cos(rA1right)*R
-    Yr1right = Y1pre + math.sin(rA1right)*R
+    c1_left_center_angle = math.radians(target_angle) + math.pi/2
+    c1_right_center_angle = math.radians(target_angle) - math.pi/2
+    c1_left_center_x = _x1pre + math.cos(c1_left_center_angle)*circle_radius
+    c1_left_center_y = _y1pre + math.sin(c1_left_center_angle)*circle_radius
+    c1_right_center_x = _x1pre + math.cos(c1_right_center_angle)*circle_radius
+    c1_right_center_y = _y1pre + math.sin(c1_right_center_angle)*circle_radius
 
     # angles from left and right current circles to preliminary dest circles
-    beta_left = math.atan2(Yr1left - Yr0left, Xr1left - Xr0left)
-    beta_right = math.atan2(Yr1right - Yr0right, Xr1right - Xr0right)
+    beta_left = math.atan2(c1_left_center_y - c0_left_center_y,
+                           c1_left_center_x - c0_left_center_x)
+    beta_right = math.atan2(c1_right_center_y - c0_right_center_y,
+                            c1_right_center_x - c0_right_center_x)
 
     # Calculate where we should get off circle and where we get to circle
-    Xf0left = Xr0left + math.cos(beta_left - math.pi/2)*R
-    Yf0left = Yr0left + math.sin(beta_left - math.pi/2)*R
-    Xf1left = Xr1left + math.cos(beta_left - math.pi/2)*R
-    Yf1left = Yr1left + math.sin(beta_left - math.pi/2)*R
+    # c0_left_offpoint_x = c0_left_center_x + math.cos(beta_left - math.pi/2)*circle_radius
+    # c0_left_offpoint_y = c0_left_center_y + math.sin(beta_left - math.pi/2)*circle_radius
+    c1_left_onpoint_x = c1_left_center_x + math.cos(beta_left - math.pi/2)*circle_radius
+    c1_left_onpoint_y = c1_left_center_y + math.sin(beta_left - math.pi/2)*circle_radius
 
-    Xf0right = Xr0right + math.cos(beta_right + math.pi/2)*R
-    Yf0right = Yr0right + math.sin(beta_right + math.pi/2)*R
-    Xf1right = Xr1right + math.cos(beta_right + math.pi/2)*R
-    Yf1right = Yr1right + math.sin(beta_right + math.pi/2)*R
+    # c0_right_offpoint_x = c0_right_center_x + math.cos(beta_right + math.pi/2)*circle_radius
+    # c0_right_offpoint_y = c0_right_center_y + math.sin(beta_right + math.pi/2)*circle_radius
+    c1_right_onpoint_x = c1_right_center_x + math.cos(beta_right + math.pi/2)*circle_radius
+    c1_right_onpoint_y = c1_right_center_y + math.sin(beta_right + math.pi/2)*circle_radius
 
     heading_left = angle_to_heading(math.degrees(beta_left))
     heading_right = angle_to_heading(math.degrees(beta_right))
 
-    # Insert new states at     States['current'] + 1
-    # FIXME: always usgin left circle, need to get the best one
     next_pos = States['current'] + 1
-    States['program'].insert(next_pos, {'name': 'sethead', 'arg': (heading_left, 'left')})
-    States['program'].insert(next_pos + 1, {'name': 'level', 'arg': (Xf1left, Yf1left, 'earth')})
-    States['program'].insert(next_pos + 2, {'name': 'sethead', 'arg': (A1head, 'left')})
-    States['program'].insert(next_pos + 3, {'name': 'level', 'arg': (X1a, Y1a, 'runway')})
+    if circle == 'left':
+        States['program'].insert(next_pos, {'name': 'sethead', 'arg': (heading_left, 'left')})
+        States['program'].insert(next_pos + 1, {'name': 'level',
+                          'arg': (c1_left_onpoint_x, c1_left_onpoint_y, 'earth')})
+        States['program'].insert(next_pos + 2, {'name': 'sethead', 'arg': (target_head, 'left')})
+        States['program'].insert(next_pos + 3, {'name': 'level', 'arg': (_x1a, _y1a, 'runway')})
+    else:
+        States['program'].insert(next_pos, {'name': 'sethead', 'arg': (heading_right, 'right')})
+        States['program'].insert(next_pos + 1, {'name': 'level',
+                          'arg': (c1_right_onpoint_x, c1_right_onpoint_y, 'earth')})
+        States['program'].insert(next_pos + 2, {'name': 'sethead', 'arg': (target_head, 'right')})
+        States['program'].insert(next_pos + 3, {'name': 'level', 'arg': (_x1a, _y1a, 'runway')})
+
 
     return True
 
