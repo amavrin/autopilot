@@ -108,14 +108,18 @@ def construct_program():
     for step in Flight['steps']:
         if step == 'n_setalt':
             for _n in range(0, 20, 2):
-                States['program'].append({ 'name': 'level', 'arg': (0, 3000 + _n * 1000) })
+                States['program'].append({ 'name': 'level',
+                        'arg': (0, 3000 + _n * 1000, 'runway') })
                 States['program'].append({ 'name': 'setalt', 'arg': 300 })
-                States['program'].append({ 'name': 'level', 'arg': (0, 3000 + (_n+1) * 1000) })
+                States['program'].append({ 'name': 'level',
+                        'arg': (0, 3000 + (_n+1) * 1000, 'runway') })
                 States['program'].append({ 'name': 'setalt', 'arg': 150 })
         elif step == 'zig_zag':
             for _n in range(1,6,2):
-                States['program'].append({ 'name': 'level', 'arg': (100, 4000 + _n * 1500) })
-                States['program'].append({ 'name': 'level', 'arg': (-100, 4000 + (_n+1) * 1500) })
+                States['program'].append({ 'name': 'level',
+                        'arg': (100, 4000 + _n * 1500, 'runway') })
+                States['program'].append({ 'name': 'level',
+                        'arg': (-100, 4000 + (_n+1) * 1500, 'runway') })
                 States['program'].append({ 'name': 'setspeed', 'arg': 80 + _n * 5 })
         elif step == 'turns':
             States['program'].append({ 'name': 'sethead', 'arg': (200, 'left') })
@@ -127,20 +131,20 @@ def construct_program():
         elif step == 'round':
             rw_head = get_rw_head()
             States['program'].append({ 'name': 'sethead', 'arg': ((rw_head + 180)%360, 'left') })
-            States['program'].append({ 'name': 'level', 'arg': (-1100, -5000) })
+            States['program'].append({ 'name': 'level', 'arg': (-1100, -5000, 'runway') })
         elif step == 'to_runway':
             States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
         else:
             error_pause("Choose correct program", 1000)
 
     # Finish
-    States['program'].append({ 'name': 'level', 'arg': (0, -5000) })
+    States['program'].append({ 'name': 'level_head', 'arg': (0, -5000) })
     # Turn to the glissade, take off speed
     States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
     States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
     States['program'].append({ 'name': 'setalt', 'arg': 600 })
-    States['program'].append({ 'name': 'level', 'arg': (0, -4000) })
-    States['program'].append({ 'name': 'level', 'arg': (0, -2500) })
+    States['program'].append({ 'name': 'level', 'arg': (0, -4000, 'runway') })
+    States['program'].append({ 'name': 'level', 'arg': (0, -2500, 'runway') })
     # start glissade
     States['program'].append({ 'name': 'descending', 'arg': (0, 0) })
     States['program'].append({ 'name': 'landing' })
@@ -540,13 +544,82 @@ def sethead_state():
         return True
     return False
 
+def level_head_state():
+    """ Go to the point and set head """
+    A0 = heading_to_angle(CurrentData['heading'])
+    (X1a, Y1a) = get_cur_arg()
+    (X1, Y1) = get_xy_from_xa_ya(X1a, Y1a)
+    A1head = get_rw_head()
+    A1 = heading_to_angle(A1head)
+    X0, Y0 = get_xy_from_lat_lon(CurrentData['latitude'],
+                                 CurrentData['longitude'])
+
+    # Turn radius
+    R = 800
+    # Preliminary distance
+    L = 1000
+
+    # Calculate left and right circles from where we are
+    rA0left = math.radians(A0) + math.pi/2
+    rA0right = math.radians(A0) - math.pi/2
+    Xr0left = X0 + math.cos(rA0left)*R
+    Yr0left = Y0 + math.sin(rA0left)*R
+    Xr0right = X0 + math.cos(rA0right)*R
+    Yr0right = Y0 + math.sin(rA0right)*R
+
+    # Calculate preliminary dest point
+    X1pre = X1 - math.cos(math.radians(A1))*L
+    Y1pre = Y1 - math.sin(math.radians(A1))*L
+
+    # Left and righr circles ar preliminary dest point
+    rA1left = math.radians(A1) + math.pi/2
+    rA1right = math.radians(A1) - math.pi/2
+    Xr1left = X1pre + math.cos(rA1left)*R
+    Yr1left = Y1pre + math.sin(rA1left)*R
+    Xr1right = X1pre + math.cos(rA1right)*R
+    Yr1right = Y1pre + math.sin(rA1right)*R
+
+    # angles from left and right current circles to preliminary dest circles
+    beta_left = math.atan2(Yr1left - Yr0left, Xr1left - Xr0left)
+    beta_right = math.atan2(Yr1right - Yr0right, Xr1right - Xr0right)
+
+    # Calculate where we should get off circle and where we get to circle
+    Xf0left = Xr0left + math.cos(beta_left - math.pi/2)*R
+    Yf0left = Yr0left + math.sin(beta_left - math.pi/2)*R
+    Xf1left = Xr1left + math.cos(beta_left - math.pi/2)*R
+    Yf1left = Yr1left + math.sin(beta_left - math.pi/2)*R
+
+    Xf0right = Xr0right + math.cos(beta_right + math.pi/2)*R
+    Yf0right = Yr0right + math.sin(beta_right + math.pi/2)*R
+    Xf1right = Xr1right + math.cos(beta_right + math.pi/2)*R
+    Yf1right = Yr1right + math.sin(beta_right + math.pi/2)*R
+
+    heading_left = angle_to_heading(math.degrees(beta_left))
+    heading_right = angle_to_heading(math.degrees(beta_right))
+
+    # Insert new states at     States['current'] + 1
+    # FIXME: always usgin left circle, need to get the best one
+    next_pos = States['current'] + 1
+    States['program'].insert(next_pos, {'name': 'sethead', 'arg': (heading_left, 'left')})
+    States['program'].insert(next_pos + 1, {'name': 'level', 'arg': (Xf1left, Yf1left, 'earth')})
+    States['program'].insert(next_pos + 2, {'name': 'sethead', 'arg': (A1head, 'left')})
+    States['program'].insert(next_pos + 3, {'name': 'level', 'arg': (X1a, Y1a, 'runway')})
+
+    return True
+
 def level_state():
     """" Process level state """
     SetPoints['climb'] = get_climb_by_altitude()
     (_x, _y) = get_xy_from_lat_lon(CurrentData['latitude'],
                                        CurrentData['longitude'])
-    (_xa, _ya) = get_cur_arg()
-    (_x1, _y1) = get_xy_from_xa_ya(_xa, _ya)
+    (_xarg, _yarg) = get_cur_arg()[0:2]
+    coord = get_cur_arg()[2]
+
+    if coord == 'runway':
+        (_x1, _y1) = get_xy_from_xa_ya(_xarg, _yarg)
+    else:
+        (_x1, _y1) = (_xarg, _yarg)
+
     heading_to_point = get_heading(_x, _y, _x1, _y1)
     SetPoints['heading'] = heading_to_point
 
@@ -738,6 +811,8 @@ def process_data(inputs):
         go_next = sethead_state()
     elif get_cur_state() == 'level':
         go_next = level_state()
+    elif get_cur_state() == 'level_head':
+        go_next = level_head_state()
     elif get_cur_state() == 'descending':
         go_next = descending_state()
     elif get_cur_state() == 'landing':
