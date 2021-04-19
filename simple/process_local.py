@@ -138,8 +138,7 @@ def construct_program():
             error_pause("Choose correct program", 1000)
 
     # Finish
-    # FIXME: make direction decision automatically
-    States['program'].append({ 'name': 'level_head', 'arg': (0, -5000, 'right') })
+    States['program'].append({ 'name': 'level_head', 'arg': (0, -5000, '') })
     # Turn to the glissade, take off speed
     States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
     States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
@@ -442,11 +441,12 @@ def get_climb_for_glissade(_xa, _ya, _lat, _lon, speed, _alt):
 
     # 1 knot is 1,68781 feet per sec
     speed_fps = speed * 1.68781
+    runway_elevation = get_rw_elev()
     # get distance-to-the-start-point/alt ratio. 1 meter is 3,28084 feets
     (_x, _y) = get_xy_from_lat_lon(_lat, _lon)
     (land_x, land_y) = get_xy_from_xa_ya(_xa, _ya)
     distance_to_landpoint = get_distance(_x, _y, land_x, land_y)
-    dist_alt_ratio = distance_to_landpoint * 3.28084 / _alt
+    dist_alt_ratio = distance_to_landpoint * 3.28084 / (_alt - runway_elevation)
     climb_required = (-1) * speed_fps / dist_alt_ratio
 
     if VERBOSE:
@@ -601,6 +601,17 @@ def level_head_state():
     heading_left = angle_to_heading(math.degrees(beta_left))
     heading_right = angle_to_heading(math.degrees(beta_right))
 
+    right_heading_delta = abs(get_heading_diff2(current_heading, heading_right, 'right')) + \
+                          abs(get_heading_diff2(heading_right, target_head, 'right'))
+    left_heading_delta = abs(get_heading_diff2(current_heading, heading_left, 'left')) + \
+                         abs(get_heading_diff2(heading_left, target_head, 'left'))
+
+    if circle not in ('right', 'left'):
+        if right_heading_delta < left_heading_delta:
+            circle = 'right'
+        else:
+            circle = 'left'
+
     next_pos = States['current'] + 1
     if circle == 'left':
         States['program'].insert(next_pos, {'name': 'sethead', 'arg': (heading_left, 'left')})
@@ -740,9 +751,11 @@ def stop_state():
     SetPoints['heading'] = get_runway_center_heading(CurrentData['latitude'],
                                                      CurrentData['longitude'],
                                                      CurrentData['speed'])
+    calc_devs()
+
     Out['aileron'] = 0.0
     Out['elevator'] = 0.0
-    Out['rudder'] = 0.0
+    Out['rudder'] = get_rudder(Deviations['heading'])
     Out['throttle'] = 0.0
     Out['flaps'] = 0.0
     Out['brake'] = True
