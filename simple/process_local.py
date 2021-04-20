@@ -138,7 +138,7 @@ def construct_program():
             error_pause("Choose correct program", 1000)
 
     # Finish
-    States['program'].append({ 'name': 'level_head', 'arg': (0, -5000, '') })
+    States['program'].append({ 'name': 'level_head', 'arg': (0, -5000) })
     # Turn to the glissade, take off speed
     States['program'].append({ 'name': 'set_runway', 'arg': Settings['landing_runway'] })
     States['program'].append({ 'name': 'setspeed', 'arg': Settings['prelanding_speed'] })
@@ -545,11 +545,97 @@ def sethead_state():
         return True
     return False
 
+def _get_circle_params(_x_cur, _y_cur, current_angle, radius, side):
+    """ Get circle center coordinates
+        given the current coordinates and the angle """
+    if side == 'left':
+        angle_diff = math.pi/2
+    elif side == 'right':
+        angle_diff = - math.pi/2
+    else:
+        error_pause("wrong parameter side: {}".format(side), 100)
+
+    center_angle = math.radians(current_angle) + angle_diff
+    center_x = _x_cur + math.cos(center_angle)*radius
+    center_y = _y_cur + math.sin(center_angle)*radius
+    return (center_x, center_y)
+
+def _get_circle_tangent_angle(_c0x, _c0y, c0_dir, _c1x, _c1y, c1_dir, radius):
+    """ Get the tangent angle to 2 circles with respect to circle direction """
+    # angles from left and right current circles to preliminary dest circles
+    tangent_angle = None
+    center_angle = math.atan2(_c1y - _c0y, _c1x - _c0x)
+    if c0_dir == c1_dir:
+        tangent_angle = center_angle
+    else:
+        center_dist = get_distance(_c0x, _c0y, _c1x, _c1y)
+        if center_dist >= 2*radius:
+            alpha = math.asin(radius/(center_dist/2))
+            if c0_dir == 'left':
+                tangent_angle = center_angle + alpha
+            else:
+                tangent_angle = center_angle - alpha
+    ###print(c0_dir, c1_dir, math.degrees(tangent_angle))
+    return tangent_angle
+
+def get_best_tangent_heading(_x0, _y0, head0, _x1, _y1, head1, radius):
+    # pylint: disable=too-many-locals
+    """ Calculate the best tangent angle of turn """
+    # Calculate left and right circles from where we are
+    _c0 = {}
+    _c1 = {}
+    angle0 = heading_to_angle(head0)
+    angle1 = heading_to_angle(head1)
+
+    for _dir in ('left', 'right'):
+        _c0[_dir] = _get_circle_params(_x0, _y0, angle0, radius, _dir)
+        _c1[_dir] = _get_circle_params(_x1, _y1, angle1, radius, _dir)
+
+    best_dir0 = None
+    best_dir1 = None
+    best_tangent_head = None
+    x_on_point = None
+    y_on_point = None
+    min_head_diff_summ = 2*360
+
+    for c0_dir in ('left', 'right'):
+        for c1_dir in ('left', 'right'):
+            tangent_angle = _get_circle_tangent_angle(
+                                        _c0[c0_dir][0],
+                                        _c0[c0_dir][1],
+                                        c0_dir,
+                                        _c1[c1_dir][0],
+                                        _c1[c1_dir][1],
+                                        c1_dir,
+                                        radius
+                                    )
+            if tangent_angle is None:
+                continue
+            tangent_head = angle_to_heading(math.degrees(tangent_angle))
+            turn0 = get_heading_diff2(head0, tangent_head, c0_dir)
+            turn1 = get_heading_diff2(tangent_head, head1, c1_dir)
+            head_diff_summ = abs(turn0) + abs(turn1)
+            if head_diff_summ < min_head_diff_summ:
+                min_head_diff_summ = head_diff_summ
+                best_dir0 = c0_dir
+                best_dir1 = c1_dir
+                best_tangent_head = tangent_head
+                # the tangent point on target circle
+                if best_dir1 == 'right':
+                    sign = 1
+                else:
+                    sign = -1
+                x_on_point = _c1[c1_dir][0] + math.cos(sign * math.pi/2 + tangent_angle)*radius
+                y_on_point = _c1[c1_dir][1] + math.sin(sign * math.pi/2 + tangent_angle)*radius
+
+    return(best_dir0, best_dir1, best_tangent_head, x_on_point, y_on_point)
+
+
 def level_head_state():
     # pylint: disable=too-many-locals
     """ Go to the point and set head """
-    current_heading = heading_to_angle(CurrentData['heading'])
-    (_x1a, _y1a, circle) = get_cur_arg()
+    current_heading = CurrentData['heading']
+    (_x1a, _y1a) = get_cur_arg()
     (_x1, _y1) = get_xy_from_xa_ya(_x1a, _y1a)
     target_head = get_rw_head()
     target_angle = heading_to_angle(target_head)
@@ -561,71 +647,20 @@ def level_head_state():
     # Preliminary distance
     pre_distance = 1000
 
-    # Calculate left and right circles from where we are
-    c0_left_center_angle = math.radians(current_heading) + math.pi/2
-    c0_right_center_angle = math.radians(current_heading) - math.pi/2
-    c0_left_center_x = _x0 + math.cos(c0_left_center_angle)*circle_radius
-    c0_left_center_y = _y0 + math.sin(c0_left_center_angle)*circle_radius
-    c0_right_center_x = _x0 + math.cos(c0_right_center_angle)*circle_radius
-    c0_right_center_y = _y0 + math.sin(c0_right_center_angle)*circle_radius
-
     # Calculate preliminary dest point
     _x1pre = _x1 - math.cos(math.radians(target_angle))*pre_distance
     _y1pre = _y1 - math.sin(math.radians(target_angle))*pre_distance
 
-    # Left and righr circles ar preliminary dest point
-    c1_left_center_angle = math.radians(target_angle) + math.pi/2
-    c1_right_center_angle = math.radians(target_angle) - math.pi/2
-    c1_left_center_x = _x1pre + math.cos(c1_left_center_angle)*circle_radius
-    c1_left_center_y = _y1pre + math.sin(c1_left_center_angle)*circle_radius
-    c1_right_center_x = _x1pre + math.cos(c1_right_center_angle)*circle_radius
-    c1_right_center_y = _y1pre + math.sin(c1_right_center_angle)*circle_radius
+    (dir0, dir1, turn_head, x_on_point, y_on_point) = get_best_tangent_heading(_x0, _y0,
+                                                current_heading,
+                                                _x1pre, _y1pre, target_head,
+                                                circle_radius)
 
-    # angles from left and right current circles to preliminary dest circles
-    beta_left = math.atan2(c1_left_center_y - c0_left_center_y,
-                           c1_left_center_x - c0_left_center_x)
-    beta_right = math.atan2(c1_right_center_y - c0_right_center_y,
-                            c1_right_center_x - c0_right_center_x)
-
-    # Calculate where we should get off circle and where we get to circle
-    # c0_left_offpoint_x = c0_left_center_x + math.cos(beta_left - math.pi/2)*circle_radius
-    # c0_left_offpoint_y = c0_left_center_y + math.sin(beta_left - math.pi/2)*circle_radius
-    c1_left_onpoint_x = c1_left_center_x + math.cos(beta_left - math.pi/2)*circle_radius
-    c1_left_onpoint_y = c1_left_center_y + math.sin(beta_left - math.pi/2)*circle_radius
-
-    # c0_right_offpoint_x = c0_right_center_x + math.cos(beta_right + math.pi/2)*circle_radius
-    # c0_right_offpoint_y = c0_right_center_y + math.sin(beta_right + math.pi/2)*circle_radius
-    c1_right_onpoint_x = c1_right_center_x + math.cos(beta_right + math.pi/2)*circle_radius
-    c1_right_onpoint_y = c1_right_center_y + math.sin(beta_right + math.pi/2)*circle_radius
-
-    heading_left = angle_to_heading(math.degrees(beta_left))
-    heading_right = angle_to_heading(math.degrees(beta_right))
-
-    right_heading_delta = abs(get_heading_diff2(current_heading, heading_right, 'right')) + \
-                          abs(get_heading_diff2(heading_right, target_head, 'right'))
-    left_heading_delta = abs(get_heading_diff2(current_heading, heading_left, 'left')) + \
-                         abs(get_heading_diff2(heading_left, target_head, 'left'))
-
-    if circle not in ('right', 'left'):
-        if right_heading_delta < left_heading_delta:
-            circle = 'right'
-        else:
-            circle = 'left'
-
-    next_pos = States['current'] + 1
-    if circle == 'left':
-        States['program'].insert(next_pos, {'name': 'sethead', 'arg': (heading_left, 'left')})
-        States['program'].insert(next_pos + 1, {'name': 'level',
-                          'arg': (c1_left_onpoint_x, c1_left_onpoint_y, 'earth')})
-        States['program'].insert(next_pos + 2, {'name': 'sethead', 'arg': (target_head, 'left')})
-        States['program'].insert(next_pos + 3, {'name': 'level', 'arg': (_x1a, _y1a, 'runway')})
-    else:
-        States['program'].insert(next_pos, {'name': 'sethead', 'arg': (heading_right, 'right')})
-        States['program'].insert(next_pos + 1, {'name': 'level',
-                          'arg': (c1_right_onpoint_x, c1_right_onpoint_y, 'earth')})
-        States['program'].insert(next_pos + 2, {'name': 'sethead', 'arg': (target_head, 'right')})
-        States['program'].insert(next_pos + 3, {'name': 'level', 'arg': (_x1a, _y1a, 'runway')})
-
+    pos = States['current']
+    States['program'].insert(pos + 1, {'name': 'sethead', 'arg': (turn_head, dir0)})
+    States['program'].insert(pos + 2, {'name': 'level', 'arg': (x_on_point, y_on_point, 'earth')})
+    States['program'].insert(pos + 3, {'name': 'sethead', 'arg': (target_head, dir1)})
+    States['program'].insert(pos + 4, {'name': 'level', 'arg': (_x1a, _y1a, 'runway')})
 
     return True
 
@@ -854,13 +889,72 @@ def process_data(inputs):
 
     return Out
 
-if __name__ == "__main__":
+def test_get_best_tangent_heading():
+    # pylint: disable=too-many-locals
+    # pylint: disable=invalid-name
+    """ main """
     parse_config()
-    _LAT = 021.34550579649
-    _LON = -157.88530113263
+    _x0 = 0
+    _y0 = 0
+    current_heading = 270
+    _x1pre = 1000
+    _y1pre = -1000
+    target_head = 270
+    circle_radius = 300
 
-    for _ya in range(500, 5000, 500):
-        (_x, _y) = get_xy_from_xa_ya(0,-_ya)
-        _h = get_heading(_x, _y, 0, 0)
-        (_lat, _lon) = get_lat_lon_from_xy(_x, _y)
-        print(_ya, _x, _y, "({}, {})".format(_lat, _lon), _h)
+    (dir0, dir1, turn_head, x_on_point, y_on_point) = get_best_tangent_heading(_x0, _y0,
+                                                current_heading,
+                                                _x1pre, _y1pre, target_head,
+                                                circle_radius)
+    print(dir0, dir1, turn_head)
+    _, ax = plt.subplots()
+    ax.plot([_x0, _x1pre, x_on_point],
+            [_y0, _y1pre, y_on_point],
+            'ro')
+
+
+    turn_angle = heading_to_angle(turn_head)
+    print(turn_head, turn_angle)
+    ax.axline((x_on_point, y_on_point), slope = math.tan(math.radians(turn_angle)),
+              color='black')
+
+    current_angle = heading_to_angle(current_heading)
+    target_angle = heading_to_angle(target_head)
+
+    ax.plot([_x0, _x0 + 300*math.cos(math.radians(current_angle))],
+            [_y0, _y0 + 300*math.sin(math.radians(current_angle))]
+            )
+
+    ax.plot([_x1pre, _x1pre + 300*math.cos(math.radians(target_angle))],
+            [_y1pre, _y1pre + 300*math.sin(math.radians(target_angle))]
+            )
+
+    rA0left = math.radians(current_angle) + math.pi/2
+    rA0right = math.radians(current_angle) - math.pi/2
+    Xr0left = _x0 + math.cos(rA0left)*circle_radius
+    Yr0left = _y0 + math.sin(rA0left)*circle_radius
+    Xr0right = _x0 + math.cos(rA0right)*circle_radius
+    Yr0right = _y0 + math.sin(rA0right)*circle_radius
+
+    rA1left = math.radians(target_angle) + math.pi/2
+    rA1right = math.radians(target_angle) - math.pi/2
+    Xr1left = _x1pre + math.cos(rA1left)*circle_radius
+    Yr1left = _y1pre + math.sin(rA1left)*circle_radius
+    Xr1right = _x1pre + math.cos(rA1right)*circle_radius
+    Yr1right = _y1pre + math.sin(rA1right)*circle_radius
+
+    c00 = plt.Circle((Xr0left, Yr0left), circle_radius)
+    c01 = plt.Circle((Xr0right, Yr0right), circle_radius)
+    c10 = plt.Circle((Xr1left, Yr1left), circle_radius, color='green')
+    c11 = plt.Circle((Xr1right, Yr1right), circle_radius, color='green')
+
+    ax.add_patch(c00)
+    ax.add_patch(c01)
+    ax.add_patch(c10)
+    ax.add_patch(c11)
+
+    plt.show()
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    test_get_best_tangent_heading()
