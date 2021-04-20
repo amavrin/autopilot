@@ -897,9 +897,9 @@ def test_get_best_tangent_heading():
     _x0 = 0
     _y0 = 0
     current_heading = 270
-    _x1pre = 1000
-    _y1pre = -1000
-    target_head = 270
+    _x1pre = 100
+    _y1pre = 0
+    target_head = 10
     circle_radius = 300
 
     (dir0, dir1, turn_head, x_on_point, y_on_point) = get_best_tangent_heading(_x0, _y0,
@@ -943,10 +943,10 @@ def test_get_best_tangent_heading():
     Xr1right = _x1pre + math.cos(rA1right)*circle_radius
     Yr1right = _y1pre + math.sin(rA1right)*circle_radius
 
-    c00 = plt.Circle((Xr0left, Yr0left), circle_radius)
-    c01 = plt.Circle((Xr0right, Yr0right), circle_radius)
-    c10 = plt.Circle((Xr1left, Yr1left), circle_radius, color='green')
-    c11 = plt.Circle((Xr1right, Yr1right), circle_radius, color='green')
+    c00 = plt.Circle((Xr0left, Yr0left), circle_radius, alpha=0.5)
+    c01 = plt.Circle((Xr0right, Yr0right), circle_radius, alpha=0.5)
+    c10 = plt.Circle((Xr1left, Yr1left), circle_radius, color='green', alpha=0.5)
+    c11 = plt.Circle((Xr1right, Yr1right), circle_radius, color='green', alpha=0.5)
 
     ax.add_patch(c00)
     ax.add_patch(c01)
