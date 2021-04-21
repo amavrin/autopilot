@@ -913,24 +913,24 @@ def test_get_best_tangent_heading():
             [_y1pre, _y1pre + 300*math.sin(math.radians(target_angle))]
             )
 
-    rA0left = math.radians(current_angle) + math.pi/2
-    rA0right = math.radians(current_angle) - math.pi/2
-    Xr0left = _x0 + math.cos(rA0left)*circle_radius
-    Yr0left = _y0 + math.sin(rA0left)*circle_radius
-    Xr0right = _x0 + math.cos(rA0right)*circle_radius
-    Yr0right = _y0 + math.sin(rA0right)*circle_radius
+    ra0left = math.radians(current_angle) + math.pi/2
+    ra0right = math.radians(current_angle) - math.pi/2
+    xr0left = _x0 + math.cos(ra0left)*circle_radius
+    yr0left = _y0 + math.sin(ra0left)*circle_radius
+    xr0right = _x0 + math.cos(ra0right)*circle_radius
+    yr0right = _y0 + math.sin(ra0right)*circle_radius
 
-    rA1left = math.radians(target_angle) + math.pi/2
-    rA1right = math.radians(target_angle) - math.pi/2
-    Xr1left = _x1pre + math.cos(rA1left)*circle_radius
-    Yr1left = _y1pre + math.sin(rA1left)*circle_radius
-    Xr1right = _x1pre + math.cos(rA1right)*circle_radius
-    Yr1right = _y1pre + math.sin(rA1right)*circle_radius
+    ra1left = math.radians(target_angle) + math.pi/2
+    ra1right = math.radians(target_angle) - math.pi/2
+    xr1left = _x1pre + math.cos(ra1left)*circle_radius
+    yr1left = _y1pre + math.sin(ra1left)*circle_radius
+    xr1right = _x1pre + math.cos(ra1right)*circle_radius
+    yr1right = _y1pre + math.sin(ra1right)*circle_radius
 
-    c00 = plt.Circle((Xr0left, Yr0left), circle_radius, alpha=0.5)
-    c01 = plt.Circle((Xr0right, Yr0right), circle_radius, alpha=0.5)
-    c10 = plt.Circle((Xr1left, Yr1left), circle_radius, color='green', alpha=0.5)
-    c11 = plt.Circle((Xr1right, Yr1right), circle_radius, color='green', alpha=0.5)
+    c00 = plt.Circle((xr0left, yr0left), circle_radius, alpha=0.5)
+    c01 = plt.Circle((xr0right, yr0right), circle_radius, alpha=0.5)
+    c10 = plt.Circle((xr1left, yr1left), circle_radius, color='green', alpha=0.5)
+    c11 = plt.Circle((xr1right, yr1right), circle_radius, color='green', alpha=0.5)
 
     ax.add_patch(c00)
     ax.add_patch(c01)
