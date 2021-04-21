@@ -1,9 +1,9 @@
 """ test process_local.py functions """
 
-from process_local import *
+import process_local
 
 def test_error_pause(capsys):
     """ test error_pause """
-    error_pause("test", 0.1)
+    process_local.error_pause("test", 0.1)
     captured = capsys.readouterr()
     assert captured.out == "ERROR: test\n"
