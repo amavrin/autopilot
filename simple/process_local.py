@@ -869,7 +869,7 @@ def process_data(inputs):
 
     return Out
 
-def test_get_best_tangent_heading():
+def tst_get_best_tangent_heading():
     # pylint: disable=too-many-locals
     """ main """
     parse_config()
@@ -936,4 +936,4 @@ def test_get_best_tangent_heading():
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    test_get_best_tangent_heading()
+    tst_get_best_tangent_heading()
