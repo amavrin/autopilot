@@ -5,8 +5,7 @@ import modbus_tk.defines as cst
 import modbus_tk.modbus_tcp as modbus_tcp
 
 CONTROLLER = "78.107.114.6"
-# "83.219.159.195"
-# "192.162.193.94"
+# other controllers are "83.219.159.195" and "192.162.193.94"
 
 MODBUS = {}
 
