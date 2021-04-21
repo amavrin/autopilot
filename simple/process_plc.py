@@ -1,13 +1,12 @@
 """ PCL interface """
 
-# import modbus_tk
 import struct
 import modbus_tk.defines as cst
 import modbus_tk.modbus_tcp as modbus_tcp
 
-#CONTROLLER = "83.219.159.195"
 CONTROLLER = "78.107.114.6"
-#CONTROLLER = "192.162.193.94"
+# "83.219.159.195"
+# "192.162.193.94"
 
 MODBUS = {}
 
