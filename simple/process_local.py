@@ -6,7 +6,6 @@ import pprint
 import configparser
 import re
 from simple_pid import PID
-# from numpy import clip
 
 Settings = {}
 SetPoints = {}
@@ -30,9 +29,6 @@ Deviations['pitch'] = 0.0
 Deviations['speed'] = 0.0
 Deviations['heading'] = 0.0
 
-# initial, takeoff, climbing, sethead,
-# setspeed
-# level, descending, landing, stop
 States = {}
 
 VERBOSE = True
@@ -241,7 +237,6 @@ def get_rudder(heading_dev):
     elif get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
         k_prop = bellshape(heading_dev, 10, limit = 0.03, zero = False)
-        #k_int = bellshape(heading_dev, 10, limit = 0.001, zero = False)
         k_int = 0
         k_der = 0.0
         (low, high) = (-0.3, 0.3)
@@ -575,7 +570,6 @@ def _get_circle_tangent_angle(_c0x, _c0y, c0_dir, _c1x, _c1y, c1_dir, radius):
                 tangent_angle = center_angle + alpha
             else:
                 tangent_angle = center_angle - alpha
-    ###print(c0_dir, c1_dir, math.degrees(tangent_angle))
     return tangent_angle
 
 def get_best_tangent_heading(_x0, _y0, head0, _x1, _y1, head1, radius):
@@ -844,8 +838,6 @@ def process_data(inputs):
     CurrentData['ground_alt'] = CurrentData['altitude'] - CurrentData['elevation']
 
     if not get_cur_flag():
-        #for pid in PIDS:
-        #    PIDS[pid].reset()
         set_cur_flag(True)
         if VERBOSE and get_cur_state() == 'initial':
             print(pprint.pprint(States))
