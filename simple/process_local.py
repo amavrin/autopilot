@@ -853,31 +853,23 @@ def process_data(inputs):
 
     print("State: {}".format(get_cur_state()))
 
-    go_next = False
-    if get_cur_state()  == 'initial':
-        go_next = initial_state()
-    elif get_cur_state() == 'setalt':
-        go_next = setalt_state()
-    elif get_cur_state() == 'setspeed':
-        go_next = setspeed_state()
-    elif get_cur_state() == 'set_runway':
-        go_next = set_runway_state()
-    elif get_cur_state() == 'takeoff':
-        go_next = takeoff_state()
-    elif get_cur_state() == 'climbing':
-        go_next = climbing_state()
-    elif get_cur_state() == 'sethead':
-        go_next = sethead_state()
-    elif get_cur_state() == 'level':
-        go_next = level_state()
-    elif get_cur_state() == 'level_head':
-        go_next = level_head_state()
-    elif get_cur_state() == 'descending':
-        go_next = descending_state()
-    elif get_cur_state() == 'landing':
-        go_next = landing_state()
-    elif get_cur_state() == 'stop':
-        stop_state()
+    state_funcs = {
+        'initial': initial_state,
+        'setalt': setalt_state,
+        'setspeed': setspeed_state,
+        'set_runway': set_runway_state,
+        'takeoff': takeoff_state,
+        'climbing': climbing_state,
+        'sethead': sethead_state,
+        'level': level_state,
+        'level_head': level_head_state,
+        'descending': descending_state,
+        'landing': landing_state,
+        'stop': stop_state
+     }
+
+    if get_cur_state() in state_funcs:
+        go_next = state_funcs[get_cur_state()]()
     else:
         error_pause("Unknown state", 100)
 
