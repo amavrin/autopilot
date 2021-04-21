@@ -149,8 +149,6 @@ def construct_program():
 
 
 def init():
-    # pylint: disable=too-many-statements
-    # pylint: disable=too-many-branches
     """ Init data for local processing """
 
     parse_config()
@@ -821,8 +819,6 @@ def calc_devs():
         print("Deviations: ", ["{}: {:+.3f}".format(x, Deviations[x]) for x in Deviations])
 
 def process_data(inputs):
-    # pylint: disable=too-many-statements
-    # pylint: disable=too-many-branches
     """ Main processing function """
     CurrentData['heading'] = float(inputs['Heading'])
     CurrentData['speed'] = float(inputs['Speed'])
@@ -875,7 +871,6 @@ def process_data(inputs):
 
 def test_get_best_tangent_heading():
     # pylint: disable=too-many-locals
-    # pylint: disable=invalid-name
     """ main """
     parse_config()
     _x0 = 0
@@ -891,25 +886,25 @@ def test_get_best_tangent_heading():
                                                 _x1pre, _y1pre, target_head,
                                                 circle_radius)
     print(dir0, dir1, turn_head)
-    _, ax = plt.subplots()
-    ax.plot([_x0, _x1pre, x_on_point],
+    _, _ax = plt.subplots()
+    _ax.plot([_x0, _x1pre, x_on_point],
             [_y0, _y1pre, y_on_point],
             'ro')
 
 
     turn_angle = heading_to_angle(turn_head)
     print(turn_head, turn_angle)
-    ax.axline((x_on_point, y_on_point), slope = math.tan(math.radians(turn_angle)),
+    _ax.axline((x_on_point, y_on_point), slope = math.tan(math.radians(turn_angle)),
               color='black')
 
     current_angle = heading_to_angle(current_heading)
     target_angle = heading_to_angle(target_head)
 
-    ax.plot([_x0, _x0 + 300*math.cos(math.radians(current_angle))],
+    _ax.plot([_x0, _x0 + 300*math.cos(math.radians(current_angle))],
             [_y0, _y0 + 300*math.sin(math.radians(current_angle))]
             )
 
-    ax.plot([_x1pre, _x1pre + 300*math.cos(math.radians(target_angle))],
+    _ax.plot([_x1pre, _x1pre + 300*math.cos(math.radians(target_angle))],
             [_y1pre, _y1pre + 300*math.sin(math.radians(target_angle))]
             )
 
@@ -932,10 +927,10 @@ def test_get_best_tangent_heading():
     c10 = plt.Circle((xr1left, yr1left), circle_radius, color='green', alpha=0.5)
     c11 = plt.Circle((xr1right, yr1right), circle_radius, color='green', alpha=0.5)
 
-    ax.add_patch(c00)
-    ax.add_patch(c01)
-    ax.add_patch(c10)
-    ax.add_patch(c11)
+    _ax.add_patch(c00)
+    _ax.add_patch(c01)
+    _ax.add_patch(c10)
+    _ax.add_patch(c11)
 
     plt.show()
 
