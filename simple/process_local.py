@@ -5,6 +5,7 @@ import math
 import pprint
 import configparser
 import re
+import os
 from simple_pid import PID
 
 Settings = {}
@@ -65,7 +66,9 @@ def get_rw_head(runway = 'base'):
 def parse_config(conffile = 'process_local.conf'):
     """ read config file """
     config = configparser.ConfigParser()
-    config.read(conffile)
+    config.read(
+        os.path.join(os.path.dirname(__file__),conffile)
+        )
     Settings['takeoffspeed'] = config.getfloat('settings', 'takeoffspeed')
     Settings['prelanding_speed'] = config.getfloat('settings', 'prelanding_speed')
     Settings['targetspeed'] = config.getfloat('settings', 'targetspeed')
