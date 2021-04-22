@@ -62,10 +62,10 @@ def get_rw_head(runway = 'base'):
     head = get_heading(_x0, _y0, _x1, _y1)
     return head
 
-def parse_config():
+def parse_config(conffile = 'process_local.conf'):
     """ read config file """
     config = configparser.ConfigParser()
-    config.read('process_local.conf')
+    config.read(conffile)
     Settings['takeoffspeed'] = config.getfloat('settings', 'takeoffspeed')
     Settings['prelanding_speed'] = config.getfloat('settings', 'prelanding_speed')
     Settings['targetspeed'] = config.getfloat('settings', 'targetspeed')
@@ -148,10 +148,10 @@ def construct_program():
     ################
 
 
-def init():
+def init(conffile = 'process_local.conf'):
     """ Init data for local processing """
 
-    parse_config()
+    parse_config(conffile)
     construct_program()
 
     PIDS['rudder'] = PID(0.0, 0.0, 0.0, setpoint=0)

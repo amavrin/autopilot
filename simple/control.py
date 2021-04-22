@@ -30,7 +30,8 @@ def receiver(sock):
 def sender(snd_sock, aileron, elevator, rudder, throttle, flaps, brake):
     # pylint: disable=too-many-arguments
     """ UDP Sender """
-    data_str = "{:.3f}:{:.3f}:{:.3f}:{:.3f}:{:.3f}:{:b}".format(aileron,elevator,rudder,throttle,flaps,brake)
+    data_str = "{:.3f}:{:.3f}:{:.3f}:{:.3f}:{:.3f}:{:b}".format(
+            aileron,elevator,rudder,throttle,flaps,brake)
     print(data_str)
     data = str.encode(data_str + "\n")
     snd_sock.sendto(data, (FG_ADDR, FG_PORT))
@@ -39,10 +40,12 @@ def main():
     """ Main function """
     parser = argparse.ArgumentParser(description='Initialize autopilot')
     parser.add_argument('-m', action='store', dest='module', help='module')
+    parser.add_argument('-f', action='store', dest='conffile',
+                        default='process_local.conf', help='conffile')
     args = parser.parse_args()
 
     processor = importlib.import_module(args.module)
-    processor.init()
+    processor.init(args.conffile)
 
     recv_sock = socket.socket(socket.AF_INET, # Internet
                      socket.SOCK_DGRAM) # UDP
