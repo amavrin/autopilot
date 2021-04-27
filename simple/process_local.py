@@ -87,6 +87,7 @@ def parse_config(conffile = 'process_local.conf'):
     Settings['takeoff_runway'] = config['settings']['takeoff_runway']
     Settings['landing_runway'] = config['settings']['landing_runway']
     Settings['turn_radius'] = config.getfloat('settings', 'turn_radius')
+    Settings['min_ground_alt'] = config.getfloat('settings', 'min_ground_alt')
 
     Flight['steps'] = re.split(', *|,', config['flight']['program'])
 
@@ -276,7 +277,7 @@ def calculate_radius(delta_time, delta_head, speed):
     """ Calculate turn radius.
         radius is positive if turns clockwise (delta_head > 0) """
     # "big number"
-    radius = None
+    radius = math.inf
     if delta_head != 0:
         speed_mps = knot_to_mps(speed)
         radius = speed_mps * delta_time / (math.radians(delta_head))
@@ -305,16 +306,22 @@ def get_aileron(heading_dev):
         k_der = prop(100, 0.01, 50, 0.05, CurrentData['speed'])
 
     if get_cur_state() == 'sethead':
-        radius = None
         if get_state_data('heading_dev') is not None:
             delta_time = time.time() - get_state_data('time')
             delta_head = get_heading_diff(heading_dev, get_state_data('heading_dev'))
             radius = calculate_radius(delta_time, delta_head, CurrentData['speed'])
-        set_state_data('heading_dev', heading_dev)
-        set_state_data('time', time.time())
-        required_radius = math.copysign(Settings['turn_radius'], heading_dev)
-        print("required_radius: {:+6.2f}, radius: {:+6.2f}"
-                .format(required_radius, radius or 999999))
+            required_radius = math.copysign(Settings['turn_radius'], heading_dev)
+            radius_diff = required_radius - radius
+            set_state_data('radius_diff_sum', get_state_data('radius_diff_sum') + radius_diff)
+            set_state_data('count', get_state_data('count') + 1)
+            average_radius_diff = get_state_data('radius_diff_sum')/get_state_data('count')
+            print("required_radius: {:+6.2f}, radius: {:+6.2f}, average_radius_diff: {:+10.7f}"
+                    .format(required_radius, radius, average_radius_diff))
+        else:
+            set_state_data('count', 0)
+            set_state_data('radius_diff_sum', 0)
+            set_state_data('heading_dev', heading_dev)
+            set_state_data('time', time.time())
 
     PIDS['aileron'].tunings = (k_prop, k_int, k_der)
     PIDS['aileron'].output_limits = (low, high)
@@ -499,7 +506,12 @@ def get_climb_for_glissade(_xa, _ya, _lat, _lon, speed, _alt):
 
 def get_climb_by_altitude():
     """ Set climb based on altitude """
-    altitude_dev = SetPoints['altitude'] - CurrentData['altitude']
+    altitude_dev = 0.0
+    if CurrentData['ground_alt'] < Settings['min_ground_alt'] \
+            or SetPoints['altitude'] - CurrentData['elevation'] < Settings['min_ground_alt']:
+        altitude_dev = Settings['min_ground_alt'] - CurrentData['ground_alt']
+    else:
+        altitude_dev = SetPoints['altitude'] - CurrentData['altitude']
     climb_limit = prop(0, 0, 100, 10, CurrentData['speed'])
     climb = s_shape(altitude_dev, 10, limit = climb_limit)
     return climb
@@ -856,6 +868,7 @@ def calc_devs():
                     SetPoints['heading'])
 
     if SetPoints['altitude'] is not None:
+
         Deviations['altitude'] = CurrentData['altitude'] - SetPoints['altitude']
     if SetPoints['climb'] is not None:
         Deviations['climb'] = CurrentData['climb'] - SetPoints['climb']

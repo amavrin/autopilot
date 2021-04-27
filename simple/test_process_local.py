@@ -26,7 +26,7 @@ def test_can_store_state_data():
 
 def test_radius_calculus():
     """ test radius calculation """
-    assert process_local.calculate_radius(1,0,100) is None
+    assert process_local.calculate_radius(1,0,100) is math.inf
     # An object moves at a constant linear speed of 10 m/sec
     # around a circle of radius 400 m. A central angle does sweeps in .0125 rads
     # in in 0.5 seconds.
