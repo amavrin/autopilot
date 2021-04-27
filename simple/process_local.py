@@ -86,6 +86,7 @@ def parse_config(conffile = 'process_local.conf'):
     Settings['level_distancedelta'] = config.getfloat('settings', 'level_distancedelta')
     Settings['takeoff_runway'] = config['settings']['takeoff_runway']
     Settings['landing_runway'] = config['settings']['landing_runway']
+    Settings['turn_radius'] = config.getfloat('settings', 'turn_radius')
 
     Flight['steps'] = re.split(', *|,', config['flight']['program'])
 
@@ -166,6 +167,19 @@ def init(conffile = 'process_local.conf'):
 def get_cur_state():
     """ Return current state """
     return States['program'][States['current']]['name']
+
+def set_state_data(key, value):
+    """ Store state values """
+    if 'data' not in States['program'][States['current']]:
+        States['program'][States['current']]['data'] = {}
+    States['program'][States['current']]['data'][key] = value
+
+def get_state_data(key):
+    """ Retrieve state data """
+    if 'data' not in States['program'][States['current']] \
+            or key not in States['program'][States['current']]['data']:
+        return None
+    return States['program'][States['current']]['data'][key]
 
 def get_cur_arg():
     """ Return current state arg """
@@ -248,32 +262,64 @@ def get_rudder(heading_dev):
     rudder = PIDS['rudder']((-1)*heading_dev)
     return rudder
 
+def knot_to_mps(knots):
+    """ convert knot to meters per second """
+    mps = knots * 0.514444
+    return mps
+
+def mps_to_knot(mps):
+    """ convert meters per second to knots """
+    knots = mps / 0.514444
+    return knots
+
+def calculate_radius(delta_time, delta_head, speed):
+    """ Calculate turn radius.
+        radius is positive if turns clockwise (delta_head > 0) """
+    # "big number"
+    radius = None
+    if delta_head != 0:
+        speed_mps = knot_to_mps(speed)
+        radius = speed_mps * delta_time / (math.radians(delta_head))
+    return radius
+
 def get_aileron(heading_dev):
     """ Sample bank processing """
+
+    dev = 0.0
+
+    k_prop = 0.0
+    k_int = 0.0
+    k_der = 0.0
+
+    (low, high) = (-0.4, 0.4)
 
     SetPoints['bank'] = 0.0
     if get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
         # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
         bank_prop = s_shape(heading_dev, 8)
         SetPoints['bank'] = bank_prop*Settings['turnbank']
+        Deviations['bank'] = CurrentData['bank'] - SetPoints['bank']
+        dev = Deviations['bank']
+        k_prop = 0.04
+        k_int = prop(50, 0.003, 100, 0.012, CurrentData['speed'], y_min = 0.0)
+        k_der = prop(100, 0.01, 50, 0.05, CurrentData['speed'])
 
-    Deviations['bank'] = CurrentData['bank'] - SetPoints['bank']
-
-    k_prop = 0.0
-    k_int = 0.0
-    k_der = 0.0
-    low = 0.0
-    high = 0.0
-
-    k_prop = 0.04
-    k_int = prop(50, 0.003, 100, 0.012, CurrentData['speed'], y_min = 0.0)
-    k_der = prop(100, 0.01, 50, 0.05, CurrentData['speed'])
-    (low, high) = (-0.4, 0.4)
+    if get_cur_state() == 'sethead':
+        radius = None
+        if get_state_data('heading_dev') is not None:
+            delta_time = time.time() - get_state_data('time')
+            delta_head = get_heading_diff(heading_dev, get_state_data('heading_dev'))
+            radius = calculate_radius(delta_time, delta_head, CurrentData['speed'])
+        set_state_data('heading_dev', heading_dev)
+        set_state_data('time', time.time())
+        required_radius = math.copysign(Settings['turn_radius'], heading_dev)
+        print("required_radius: {:+6.2f}, radius: {:+6.2f}"
+                .format(required_radius, radius or 999999))
 
     PIDS['aileron'].tunings = (k_prop, k_int, k_der)
     PIDS['aileron'].output_limits = (low, high)
 
-    aileron = PIDS['aileron'](Deviations['bank'])
+    aileron = PIDS['aileron'](dev)
     return aileron
 
 def get_elevator(climb_dev):
@@ -417,7 +463,7 @@ def get_runway_center_correction(speed, center_dist):
         If we need to go clock-wise, correction is negative.
         If we need to go counter-clock-wise, correction is positive. """
     # Knots to m/s
-    speed_meter_ps = speed * 0.514444
+    speed_meter_ps = knot_to_mps(speed)
     # get the angle to center on railway in 20 sec
     center_correction = math.degrees(math.atan(center_dist/(speed_meter_ps*20 + 1)))
     return center_correction
