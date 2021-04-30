@@ -15,6 +15,7 @@ CurrentData = {}
 PIDS = {}
 Runway = {}
 Flight = {}
+DiffData = {}
 
 Out = {}
 Out['aileron'] = 0.0
@@ -35,9 +36,13 @@ States = {}
 
 VERBOSE = True
 
+def error_message(_s):
+    """ Print message """
+    print("ERROR: {}".format(_s))
+
 def error_pause(_s,_t):
     """ Print message and sleep """
-    print("ERROR: {}".format(_s))
+    error_message(_s)
     time.sleep(_t)
 
 def get_rw_start_lat_lon(runway = 'base'):
@@ -83,7 +88,8 @@ def parse_config(conffile = 'process_local.conf'):
     Settings['glissadespeed'] = config.getfloat('settings', 'glissadespeed')
     Settings['engine_on_rpm'] = config.getint('settings', 'engine_on_rpm')
     Settings['turnbank'] = config.getfloat('settings', 'turnbank')
-    Settings['turn_headingdelta'] = config.getfloat('settings', 'turnbank')
+    Settings['turnbank_max'] = config.getfloat('settings', 'turnbank_max')
+    Settings['turn_headingdelta'] = config.getfloat('settings', 'turn_headingdelta')
     Settings['level_distancedelta'] = config.getfloat('settings', 'level_distancedelta')
     Settings['takeoff_runway'] = config['settings']['takeoff_runway']
     Settings['landing_runway'] = config['settings']['landing_runway']
@@ -311,7 +317,7 @@ def get_aileron(heading_dev):
     (low, high) = (-0.4, 0.4)
 
     SetPoints['bank'] = 0.0
-    if get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
+    if get_cur_state() in ('level', 'climbing', 'descending'):
         # 0 at heading_dev == 0, near 1 at large heading_dev, with the same sign as heading_dev
         bank_prop = s_shape(heading_dev, 8)
         SetPoints['bank'] = bank_prop*Settings['turnbank']
@@ -322,19 +328,25 @@ def get_aileron(heading_dev):
         k_der = prop(100, 0.01, 50, 0.05, CurrentData['speed'])
 
     if get_cur_state() == 'sethead':
-        if get_state_data('heading_dev') is not None:
-            delta_time = time.time() - get_state_data('time')
-            delta_head = get_heading_diff(heading_dev, get_state_data('heading_dev'))
-            radius = calculate_radius(delta_time, delta_head, CurrentData['speed'])
-            required_radius = math.copysign(Settings['turn_radius'], heading_dev)
-            print("required_radius: {:+6.2f}, radius: {:+6.2f}"
+        delta_time = DiffData['time']
+        delta_head = DiffData['heading']
+        radius = calculate_radius(delta_time, delta_head, CurrentData['speed'])
+        required_radius = math.copysign(Settings['turn_radius'], heading_dev)
+        print("required_radius: {:+6.2f}, radius: {:+6.2f}"
                     .format(required_radius, radius))
-            delta_head_required = get_required_delta_head(required_radius,
+        delta_head_required = get_required_delta_head(required_radius,
                     CurrentData['speed'], delta_time)
-            print("delta_head_required: {:+6.2f}, delta_head: {:+6.2f}"
+        print("delta_head_required: {:+6.2f}, delta_head: {:+6.2f}"
                     .format(delta_head_required, delta_head))
-        set_state_data('heading_dev', heading_dev)
-        set_state_data('time', time.time())
+        dev = delta_head - delta_head_required
+
+        k_prop = 0.3
+        k_int = 0.005
+
+        if CurrentData['bank'] >= Settings['turnbank_max']:
+            error_message("CurrentData['bank'] ({}) >= Settings['turnbank_max'] ({})"
+                    .format(CurrentData['bank'], Settings['turnbank_max']))
+            dev = CurrentData['bank']
 
     PIDS['aileron'].tunings = (k_prop, k_int, k_der)
     PIDS['aileron'].output_limits = (low, high)
@@ -709,7 +721,7 @@ def level_head_state():
                                  CurrentData['longitude'])
 
     # Turn radius
-    circle_radius = 800
+    circle_radius = Settings['turn_radius']
     # Preliminary distance
     pre_distance = 1000
 
@@ -895,6 +907,8 @@ def calc_devs():
 
 def process_data(inputs):
     """ Main processing function """
+    prev_data = CurrentData.copy()
+
     CurrentData['heading'] = float(inputs['Heading'])
     CurrentData['speed'] = float(inputs['Speed'])
     CurrentData['altitude'] = float(inputs['Altitude'])
@@ -907,6 +921,11 @@ def process_data(inputs):
     CurrentData['elevation'] = float(inputs['Elevation'])
 
     CurrentData['ground_alt'] = CurrentData['altitude'] - CurrentData['elevation']
+    CurrentData['time'] = time.time()
+
+    for _k in CurrentData:
+        if _k in prev_data:
+            DiffData[_k] = CurrentData[_k] - prev_data[_k]
 
     if not get_cur_flag():
         set_cur_flag(True)
