@@ -531,12 +531,11 @@ def get_climb_for_glissade(_xa, _ya, _lat, _lon, speed, _alt):
 
 def get_climb_by_altitude():
     """ Set climb based on altitude """
-    altitude_dev = 0.0
+    climb = None
     if CurrentData['ground_alt'] < Settings['min_ground_alt'] \
             or SetPoints['altitude'] - CurrentData['elevation'] < Settings['min_ground_alt']:
-        altitude_dev = Settings['min_ground_alt'] - CurrentData['ground_alt']
-    else:
-        altitude_dev = SetPoints['altitude'] - CurrentData['altitude']
+        error_message("Too low")
+    altitude_dev = SetPoints['altitude'] - CurrentData['altitude']
     climb_limit = prop(0, 0, 100, 10, CurrentData['speed'])
     climb = s_shape(altitude_dev, 10, limit = climb_limit)
     return climb
