@@ -254,13 +254,16 @@ def get_rudder(heading_dev):
     low = 0.0
     high = 0.0
 
-    if get_cur_state() in ('takeoff', 'stop', 'landing'):
+    if get_cur_state() in ('takeoff'):
         (k_prop, k_int, k_der) = (0.01, 0.001, 0.03)
+        (low, high) = (-0.3, 0.3)
+    elif get_cur_state() in ('stop', 'landing'):
+        (k_prop, k_int, k_der) = (0.005, 0.02, 0.02)
         (low, high) = (-0.3, 0.3)
     elif get_cur_state() in ('level', 'climbing', 'sethead', 'descending'):
         # 1 at heading_dev == 0, near 0 at large heading_dev
-        k_prop = bellshape(heading_dev, 10, limit = 0.03, zero = False)
-        k_int = 0
+        k_prop = bellshape(heading_dev, 1, limit = 0.03, zero = False)
+        k_int = 0.01
         k_der = 0.0
         (low, high) = (-0.3, 0.3)
 
@@ -531,7 +534,6 @@ def get_climb_for_glissade(_xa, _ya, _lat, _lon, speed, _alt):
 
 def get_climb_by_altitude():
     """ Set climb based on altitude """
-    climb = None
     if CurrentData['ground_alt'] < Settings['min_ground_alt'] \
             or SetPoints['altitude'] - CurrentData['elevation'] < Settings['min_ground_alt']:
         error_message("Too low")
