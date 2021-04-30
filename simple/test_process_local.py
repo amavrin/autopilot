@@ -26,7 +26,7 @@ def test_can_store_state_data():
 
 def test_radius_calculus():
     """ test radius calculation """
-    assert process_local.calculate_radius(1,0,100) is None
+    assert process_local.calculate_radius(1,0,100) is math.inf
     # An object moves at a constant linear speed of 10 m/sec
     # around a circle of radius 400 m. A central angle does sweeps in .0125 rads
     # in in 0.5 seconds.
@@ -37,3 +37,11 @@ def test_radius_calculus():
     radius = process_local.calculate_radius(0.5, -delta_head,
                 process_local.mps_to_knot(10))
     assert -399 > radius > -401
+
+def test_get_required_delta_head():
+    """ test get_required_delta_head """
+    assert process_local.get_required_delta_head(400, 0, 1) == 0
+    alpha = process_local.get_required_delta_head(400, 100, 1)
+    assert 7.36 < alpha < 7.37
+    alpha = process_local.get_required_delta_head(-400, 100, 1)
+    assert -7.36 > alpha > - 7.37
