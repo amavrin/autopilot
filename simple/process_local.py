@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 """ Process data locally """
 
 import time
@@ -283,6 +284,21 @@ def calculate_radius(delta_time, delta_head, speed):
         radius = speed_mps * delta_time / (math.radians(delta_head))
     return radius
 
+def get_required_delta_head(radius, speed, delta_time):
+    """ which angle we should be turning with the current speed
+        parameters:
+            speed in knots
+            radius in meters with the sign
+            delta time
+        returns: delta head in degrees
+    """
+
+    speed_mps = knot_to_mps(speed)
+    angle_covered = speed_mps * delta_time / radius
+    angle_covered_degrees = math.degrees(angle_covered)
+    delta_head = angle_covered_degrees
+    return delta_head
+
 def get_aileron(heading_dev):
     """ Sample bank processing """
 
@@ -311,17 +327,14 @@ def get_aileron(heading_dev):
             delta_head = get_heading_diff(heading_dev, get_state_data('heading_dev'))
             radius = calculate_radius(delta_time, delta_head, CurrentData['speed'])
             required_radius = math.copysign(Settings['turn_radius'], heading_dev)
-            radius_diff = required_radius - radius
-            set_state_data('radius_diff_sum', get_state_data('radius_diff_sum') + radius_diff)
-            set_state_data('count', get_state_data('count') + 1)
-            average_radius_diff = get_state_data('radius_diff_sum')/get_state_data('count')
-            print("required_radius: {:+6.2f}, radius: {:+6.2f}, average_radius_diff: {:+10.7f}"
-                    .format(required_radius, radius, average_radius_diff))
-        else:
-            set_state_data('count', 0)
-            set_state_data('radius_diff_sum', 0)
-            set_state_data('heading_dev', heading_dev)
-            set_state_data('time', time.time())
+            print("required_radius: {:+6.2f}, radius: {:+6.2f}"
+                    .format(required_radius, radius))
+            delta_head_required = get_required_delta_head(required_radius,
+                    CurrentData['speed'], delta_time)
+            print("delta_head_required: {:+6.2f}, delta_head: {:+6.2f}"
+                    .format(delta_head_required, delta_head))
+        set_state_data('heading_dev', heading_dev)
+        set_state_data('time', time.time())
 
     PIDS['aileron'].tunings = (k_prop, k_int, k_der)
     PIDS['aileron'].output_limits = (low, high)

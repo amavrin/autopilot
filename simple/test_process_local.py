@@ -37,3 +37,11 @@ def test_radius_calculus():
     radius = process_local.calculate_radius(0.5, -delta_head,
                 process_local.mps_to_knot(10))
     assert -399 > radius > -401
+
+def test_get_required_delta_head():
+    """ test get_required_delta_head """
+    assert process_local.get_required_delta_head(400, 0, 1) == 0
+    alpha = process_local.get_required_delta_head(400, 100, 1)
+    assert 7.36 < alpha < 7.37
+    alpha = process_local.get_required_delta_head(-400, 100, 1)
+    assert -7.36 > alpha > - 7.37
