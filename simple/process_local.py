@@ -254,7 +254,7 @@ def get_rudder(heading_dev):
     low = 0.0
     high = 0.0
 
-    if get_cur_state() in ('takeoff'):
+    if get_cur_state() == 'takeoff':
         (k_prop, k_int, k_der) = (0.01, 0.001, 0.03)
         (low, high) = (-0.3, 0.3)
     elif get_cur_state() in ('stop', 'landing'):
